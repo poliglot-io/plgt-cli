@@ -221,7 +221,7 @@ class TestEndToEndCrypto:
         # Server generates ephemeral keypair
         server_private, server_public = generate_keypair()
 
-        # Server derives symmetric key (ECDH + BLAKE2b, matching E2ECryptoService)
+        # Server derives symmetric key (ECDH + BLAKE2b)
         raw_shared = crypto_scalarmult(bytes(server_private), bytes(client_public))
         server_symmetric_key = blake2b(raw_shared, digest_size=32, encoder=RawEncoder)
 
