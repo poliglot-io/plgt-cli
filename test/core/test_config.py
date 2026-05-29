@@ -90,10 +90,9 @@ class TestAppConfigDefaults:
             mock_settings.CONFIG_ROOT = Path(tmpdir)
 
             config = AppConfig()
-            config.set_defaults(workspace="my-workspace", model="anthropic/claude")
+            config.set_defaults(workspace="my-workspace")
 
             assert config.get("defaults", "workspace") == "my-workspace"
-            assert config.get("defaults", "model") == "anthropic/claude"
 
 
 class TestAppConfigDeployment:

@@ -74,8 +74,8 @@ def defaults(
         # Base-URL configuration is its own self-contained flow: it
         # writes [defaults] AND [deployment] and prints a different
         # success line. Run it first so a single invocation can both
-        # switch deployments and set workspace/model, but persist
-        # workspace/model afterwards so they apply to the new deployment.
+        # switch deployments and set workspace, but persist workspace
+        # afterwards so it applies to the new deployment.
         _apply_base_url(base_url)
 
     updates = {}
