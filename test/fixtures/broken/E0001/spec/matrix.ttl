@@ -1,0 +1,3 @@
+@prefix plgt-mtx: <https://poliglot.io/os/spec/matrix#> .
+@prefix bk: <https://example.com/spec/broken# .
+bk: a plgt-mtx:Matrix .

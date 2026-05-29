@@ -1,0 +1,8 @@
+@prefix ex: <http://example.org/> .
+
+# This is intentionally malformed RDF for error testing
+ex:badData rdf:type ex:UndefinedClass
+    ex:missingProperty "value with no closing quote ;
+
+# Missing closing statements and syntax errors
+ex:incomplete

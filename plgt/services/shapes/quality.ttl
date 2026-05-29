@@ -1,0 +1,68 @@
+@prefix cmns-av: <https://www.omg.org/spec/Commons/AnnotationVocabulary/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix plgt-cli: <https://poliglot.io/plgt/cli/shapes#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+
+# CLI-only quality / authoring-guidance shapes.
+
+#
+
+# These shapes are bundled with the `plgt` CLI and merged into the assembled
+
+# graph during `plgt validate` (phase 6). They are intentionally NOT part of
+
+# the plgt (os) system matrix: the platform's server-side validation only
+
+# enforces semantic correctness, while these are developer-facing hints that
+
+# would be noise in published-package validation.
+
+#
+
+# All property shapes are sh:Info — recommendations, not errors. The CLI
+
+# routes them to PLGT_I0500 (`SHACL suggestion`) and the assembled-graph
+
+# filter limits emission to subjects in the project's local namespace.
+
+plgt-cli:ResourceAnnotationShape
+    a sh:NodeShape ;
+    rdfs:label "resource annotation shape" ;
+    dct:description "Recommends documentation annotations on every named resource. Hints are sh:Info — they guide authors (and agents) toward complete, discoverable docs without failing validation."@en ;
+    sh:targetClass rdfs:Resource ;
+    sh:property plgt-cli:ResourceAnnotation-label ;
+    sh:property plgt-cli:ResourceAnnotation-definition ;
+    sh:property plgt-cli:ResourceAnnotation-usageNote ;
+    sh:property plgt-cli:ResourceAnnotation-explanatoryNote ;
+    sh:closed false .
+
+plgt-cli:ResourceAnnotation-label
+    a sh:PropertyShape ;
+    sh:path rdfs:label ;
+    sh:severity sh:Info ;
+    sh:minCount 1 ;
+    sh:message "Consider adding an rdfs:label — a short human-readable name shown in editors, palettes, and search results."@en .
+
+plgt-cli:ResourceAnnotation-definition
+    a sh:PropertyShape ;
+    sh:path skos:definition ;
+    sh:severity sh:Info ;
+    sh:minCount 1 ;
+    sh:message "Consider adding a skos:definition — a precise, single-sentence definition that explains what this resource *is*."@en .
+
+plgt-cli:ResourceAnnotation-usageNote
+    a sh:PropertyShape ;
+    sh:path cmns-av:usageNote ;
+    sh:severity sh:Info ;
+    sh:minCount 1 ;
+    sh:message "Consider adding a cmns-av:usageNote — guidance on *when and how* to use this resource (the practical context that a definition omits)."@en .
+
+plgt-cli:ResourceAnnotation-explanatoryNote
+    a sh:PropertyShape ;
+    sh:path cmns-av:explanatoryNote ;
+    sh:severity sh:Info ;
+    sh:minCount 1 ;
+    sh:message "Consider adding a cmns-av:explanatoryNote — additional rationale, history, or design context that helps readers understand *why* this resource exists."@en .

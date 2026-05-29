@@ -1,0 +1,6 @@
+INSERT {
+    ?s bk:nonExistentTermInSparql ?o
+}
+WHERE {
+    ?s ?p ?o
+}

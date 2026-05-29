@@ -1,0 +1,10 @@
+@prefix bk: <https://example.com/spec/broken#> .
+@prefix plgt-mtx: <https://poliglot.io/os/spec/matrix#> .
+@prefix plgt-scrt: <https://poliglot.io/os/spec/secrets#> .
+
+
+bk:
+    a plgt-mtx:Matrix .
+
+bk:SomeApiKey
+    a plgt-scrt:ManagedSecret .

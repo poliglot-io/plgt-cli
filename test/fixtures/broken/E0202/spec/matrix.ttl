@@ -1,0 +1,9 @@
+@prefix bk: <https://example.com/spec/broken#> .
+@prefix plgt-mtx: <https://poliglot.io/os/spec/matrix#> .
+
+
+bk:
+    a plgt-mtx:Matrix .
+
+bk:Thing
+    a bk:DoesNotExistClass .

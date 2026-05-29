@@ -1,0 +1,7 @@
+@prefix bk: <https://example.com/spec/broken#> .
+@prefix plgt: <https://poliglot.io/os/spec#> .
+@prefix plgt-proc: <https://poliglot.io/os/spec/processes#> .
+
+
+bk:Handler
+    plgt:executesFunction bk:nonExistentFunction .

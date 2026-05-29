@@ -1,0 +1,47 @@
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# uv / virtualenvs
+.venv/
+.python-version
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+
+# Ruff / type checkers
+.ruff_cache/
+.mypy_cache/
+.pytype/
+.pyre/
+
+# Generated files (build-time substitutions)
+plgt/generated/*.py
+!plgt/generated/__init__.py
+
+# Workspace state (created by `plgt init`)
+.matrix/
+
+# Editors / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.DS_Store
+
+# Local env
+.env
+.env.local
+.env.*.local

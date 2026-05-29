@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Poliglot documentation
+    url: https://poliglot.io/docs
+    about: Reference docs for the Poliglot platform, CLI, and matrix specs.
+  - name: Security report
+    url: https://github.com/poliglot-io/plgt-cli/security/advisories/new
+    about: Privately disclose a security vulnerability via GitHub Security Advisories.

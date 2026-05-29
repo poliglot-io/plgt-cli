@@ -1,0 +1,24 @@
+@prefix ex: <http://example.org/matrix/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+
+# Matrix Instance Data
+
+ex:testMatrix
+    rdf:type ex:Matrix ;
+    ex:hasVersion "1.0.0" ;
+    rdfs:label "Test Matrix" ;
+    rdfs:comment "A test matrix for e2e validation" ;
+    ex:hasSpecification ex:testSpec .
+
+ex:testSpec
+    rdf:type ex:Specification ;
+    rdfs:label "Test Specification" ;
+    rdfs:comment "Test specification for e2e testing" .
+
+ex:productionMatrix
+    rdf:type ex:Matrix ;
+    ex:hasVersion "2.1.0" ;
+    rdfs:label "Production Matrix" ;
+    rdfs:comment "Production-ready matrix implementation" .
