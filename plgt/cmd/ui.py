@@ -144,9 +144,7 @@ def build(
             )
         else:
             had_failure = True
-            logger.error(
-                f"  ✗ {matrix_config.name}: {result.error}"
-            )
+            logger.error(f"  ✗ {matrix_config.name}: {result.error}")
 
     if had_failure:
         raise typer.Exit(1)
