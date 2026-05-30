@@ -1,0 +1,25 @@
+---
+title: "plgt remove"
+description: "Remove a dependency from poliglot.yml and sync."
+---
+
+Remove a dependency from poliglot.yml and sync.
+
+Drops ``publisher/name`` from ``poliglot.yml``'s ``dependencies:``
+map, then triggers a sync to prune the cache, unless ``--no-sync``
+is passed.
+
+## Synopsis
+
+```bash
+plgt remove [target <TEXT>] [--no-sync] [--from-workspace <TEXT>] [--from-registry]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `target` | Registry ref 'publisher/name' to remove from poliglot.yml's dependencies. |
+| `--no-sync` | Skip the local cache sync that normally follows. |
+| `--from-workspace` | Sync mode for the post-remove sync. Same semantics as `plgt sync`. |
+| `--from-registry` | Sync mode for the post-remove sync. Same semantics as `plgt sync`. |

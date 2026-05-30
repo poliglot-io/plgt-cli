@@ -1,0 +1,20 @@
+---
+title: "plgt format"
+description: "Format Turtle and SPARQL files in place."
+---
+
+Format Turtle and SPARQL files in place.
+
+## Synopsis
+
+```bash
+plgt format [paths <PATH>] [--check] [--diff]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `paths` | Files or directories to format. Directories are walked recursively. With no argument, formats the current directory. |
+| `--check` | Don't write anything — exit 1 if any file would change. Mirrors the ergonomics of `ruff format --check` / `prettier --check` for CI use. |
+| `--diff` | Print a unified diff of every file that would change without writing. Implies --check (no writes). |

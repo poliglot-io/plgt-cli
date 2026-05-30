@@ -1,0 +1,25 @@
+---
+title: "plgt extension create"
+description: "Create a new matrix extension."
+---
+
+Create a new matrix extension.
+
+Creates the extension and triggers partial re-deployment of the target matrix.
+The extension will be marked as 'pending' until the assembly completes.
+Requires workspace admin permissions.
+
+## Synopsis
+
+```bash
+plgt extension create [--matrix <TEXT>] [--file <PATH>] [--workspace <TEXT>] [--label <TEXT>]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--matrix` / `-m` | Target matrix URI to extend. |
+| `--file` / `-f` | Path to Turtle content file. |
+| `--workspace` / `-w` | Target workspace. Uses default workspace if not specified. |
+| `--label` / `-l` | Optional label for the extension. |

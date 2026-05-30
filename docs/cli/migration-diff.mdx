@@ -1,0 +1,23 @@
+---
+title: "plgt migration diff"
+description: "Structural diff between two matrix definition graphs."
+---
+
+Structural diff between two matrix definition graphs.
+
+Reports predicates and classes added, removed, or moved between versions. The output is a
+starting point for authoring a migration — it is a *heuristic*, not a generator. The author
+still writes the SPARQL UPDATE; this command just narrows the search.
+
+## Synopsis
+
+```bash
+plgt migration diff [--from <PATH>] [--to <PATH>]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--from` | Path to the older matrix definition. |
+| `--to` | Path to the newer matrix definition. |

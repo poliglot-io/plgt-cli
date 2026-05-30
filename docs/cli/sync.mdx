@@ -1,0 +1,28 @@
+---
+title: "plgt sync"
+description: "Sync local dependency cache from poliglot.yml."
+---
+
+Sync local dependency cache from poliglot.yml.
+
+Reads ``engineVersion`` and ``dependencies:`` from ``poliglot.yml``,
+resolves everything transitively, and populates the per-mode cache
+subtree under ``.matrix/deps/``. Writes a per-mode lockfile so
+subsequent runs are deterministic.
+
+To add a new dependency, use ``plgt add``. To deploy to a workspace,
+use ``plgt install --workspace <slug>``.
+
+## Synopsis
+
+```bash
+plgt sync [--update] [--from-workspace <TEXT>] [--from-registry]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--update` | Re-resolve every entry against the current source-of-truth (workspace or registry) and rewrite the lockfile. Cache markers are ignored so packages are re-fetched. |
+| `--from-workspace` | Sync against the named workspace's installed packages. Pins each declared dep to the version the workspace has; falls back to registry-resolve for deps the workspace doesn't have (emits PLGT_W0902 to flag the pre-push gap). Mutually exclusive with --from-registry. Defaults to the configured default workspace when neither flag is supplied. |
+| `--from-registry` | Sync from the public registry only (anonymous). Bypasses any default workspace and resolves each dep to the latest version compatible with the project's engineVersion. Mutually exclusive with --from-workspace. Use for OSS-repo CI where the lockfile must be reproducible without workspace state. |

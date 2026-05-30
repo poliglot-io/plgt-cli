@@ -1,0 +1,22 @@
+---
+title: "plgt schema list"
+description: "List every term in the assembled schema, optionally filtered by type."
+---
+
+List every term in the assembled schema, optionally filtered by type.
+
+## Synopsis
+
+```bash
+plgt schema list [--filter <TEXT>] [--project-dir <PATH>] [--json] [--from-workspace <TEXT>] [--from-registry]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--filter` | Restrict to terms whose rdf:type equals this URI. |
+| `--project-dir` / `-d` | Project directory. Defaults to current working directory. |
+| `--json` | Emit JSON instead of pretty output. |
+| `--from-workspace` | Query against the named workspace's cache subtree. |
+| `--from-registry` | Query against the registry-resolve cache subtree. |

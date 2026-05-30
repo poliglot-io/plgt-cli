@@ -1,0 +1,22 @@
+---
+title: "plgt schema describe"
+description: "Dump structured metadata for a class, property, or named individual."
+---
+
+Dump structured metadata for a class, property, or named individual.
+
+## Synopsis
+
+```bash
+plgt schema describe [uri <TEXT>] [--project-dir <PATH>] [--json] [--from-workspace <TEXT>] [--from-registry]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `uri` | Full URI or prefixed name (e.g. `plgt-act:Action`) of the term to describe. |
+| `--project-dir` / `-d` | Project directory. Defaults to current working directory. |
+| `--json` | Emit JSON instead of pretty output. |
+| `--from-workspace` | Query against the named workspace's cache subtree. |
+| `--from-registry` | Query against the registry-resolve cache subtree. |

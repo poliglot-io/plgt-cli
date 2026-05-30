@@ -1,0 +1,21 @@
+---
+title: "plgt lsp"
+description: "Launch the Language Server Protocol server on stdio."
+---
+
+Launch the Language Server Protocol server on stdio.
+
+Blocks until the editor client disconnects. Stdout carries the LSP
+wire protocol; stderr carries diagnostic logs.
+
+## Synopsis
+
+```bash
+plgt lsp [--stdio]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--stdio` | Use stdio transport (the default and only supported transport). Accepted for compatibility with LSP clients (e.g. vscode-languageclient) that auto-append `--stdio` when configured for stdio transport. |

@@ -1,0 +1,22 @@
+---
+title: "plgt extension delete"
+description: "Delete an extension."
+---
+
+Delete an extension.
+
+Triggers partial re-deployment of the target matrix.
+
+## Synopsis
+
+```bash
+plgt extension delete [extension_id <TEXT>] [--workspace <TEXT>] [--yes]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `extension_id` | The extension ID. |
+| `--workspace` / `-w` | Target workspace. Uses default workspace if not specified. |
+| `--yes` / `-y` | Skip confirmation prompt. |

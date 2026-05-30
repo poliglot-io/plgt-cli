@@ -1,0 +1,19 @@
+---
+title: "plgt build"
+description: "Build package from RDF specification files."
+---
+
+Build package from RDF specification files.
+
+## Synopsis
+
+```bash
+plgt build [--config <PATH>] [--no-validate]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--config` / `-c` | Path to poliglot.yml configuration file. Defaults to poliglot.yml in current directory. |
+| `--no-validate` | Skip the validation pipeline. By default `plgt build` runs the same checks as `plgt validate` and aborts on errors — use this flag for fast packaging when you've validated separately or are knowingly building a partial spec. |

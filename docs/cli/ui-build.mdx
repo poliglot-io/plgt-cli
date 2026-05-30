@@ -1,0 +1,32 @@
+---
+title: "plgt ui build"
+description: "Build UI component bundles for matrices with components configured."
+---
+
+Build UI component bundles for matrices with components configured.
+
+Reads ``poliglot.yml`` and invokes the underlying ``poliglot-ui build``
+once per matrix that declares ``components:``. Writes the bundle to
+``<matrix>/<outputDir>/dist/components.js`` and the generated TTL to
+``<matrix>/<outputDir>/generated/components.ttl``.
+
+Use ``plgt build`` to run this as part of the full package build —
+this subcommand exists for the iteration loop when you just want the
+JS bundle rebuilt.
+
+Example:
+    plgt ui build
+    plgt ui build --matrix tasks
+
+## Synopsis
+
+```bash
+plgt ui build [--dir <TEXT>] [--matrix <TEXT>]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--dir` / `-d` | Project directory containing poliglot.yml. Default: `.`. |
+| `--matrix` / `-m` | Build only the named matrix. Defaults to every matrix in the project that declares 'components:'. |

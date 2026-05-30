@@ -1,0 +1,22 @@
+---
+title: "plgt get-lifecycle-validation-report"
+description: "Get the SHACL validation report for a command."
+---
+
+Get the SHACL validation report for a command.
+
+## Synopsis
+
+```bash
+plgt get-lifecycle-validation-report [command_id <TEXT>] [--package <TEXT>] [--latest] [--workspace <TEXT>] [--formatted]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `command_id` | The command ID to get the validation report for. Required unless --latest is used. |
+| `--package` / `-p` | Package name. Required when using --latest. |
+| `--latest` / `-l` | Get the validation report for the latest command of the package. |
+| `--workspace` / `-w` | Target workspace. Uses default workspace if not specified. |
+| `--formatted` / `-f` | Display formatted report instead of raw Turtle. |
