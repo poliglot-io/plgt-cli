@@ -38,6 +38,13 @@ jobs:
       - name: Tests
         run: uv run pytest -q
 
+      # Regenerate the CLI surface JSON and fail if the committed file is
+      # stale. kleo's docs site consumes surface/cli.json at release tags;
+      # drift here would silently ship reference docs that don't match the
+      # CLI's actual command tree.
+      - name: CLI surface drift check
+        run: uv run python scripts/gen_cli_surface.py --check
+
       - name: Build sdist + wheel
         run: uv build
 

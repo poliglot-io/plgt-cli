@@ -1,0 +1,1814 @@
+{
+  "cli": "plgt",
+  "commands": [
+    {
+      "deprecated": false,
+      "help": "Add a dependency to poliglot.yml and sync.\n\nWrites ``publisher/name`` to ``poliglot.yml``'s ``dependencies:`` map\nwith a minor-floor range derived from the resolved version (e.g.\n``\">=1.5 <2\"`` when latest is 1.5.x). Then triggers a sync to\npopulate the local cache, unless ``--no-sync`` is passed.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Registry ref 'publisher/name[@version]' to add to poliglot.yml's dependencies. Omit @version to pin to the latest compatible version's minor floor.",
+          "name": "target",
+          "opts": [
+            "target"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Skip the local cache sync that normally follows. Useful when batching multiple adds before a single sync.",
+          "name": "no_sync",
+          "opts": [
+            "--no-sync"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Sync mode to use after adding. Same semantics as `plgt sync --from-workspace`. Ignored when --no-sync is passed.",
+          "name": "from_workspace",
+          "opts": [
+            "--from-workspace"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Sync mode to use after adding. Same semantics as `plgt sync --from-registry`. Ignored when --no-sync is passed.",
+          "name": "from_registry",
+          "opts": [
+            "--from-registry"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "add"
+      ],
+      "shortHelp": "Add a dependency to poliglot.yml and sync."
+    },
+    {
+      "deprecated": false,
+      "help": "Create a new personal access token.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Human-readable name for the API key",
+          "name": "name",
+          "opts": [
+            "name"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Expiration duration: 7d, 14d, 30d, 90d, or never",
+          "name": "expires",
+          "opts": [
+            "--expires"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "function"
+        }
+      ],
+      "path": [
+        "auth",
+        "create-key"
+      ],
+      "shortHelp": "Create a new personal access token."
+    },
+    {
+      "deprecated": false,
+      "help": "List all personal access tokens.",
+      "hidden": false,
+      "params": [],
+      "path": [
+        "auth",
+        "list-keys"
+      ],
+      "shortHelp": "List all personal access tokens."
+    },
+    {
+      "deprecated": false,
+      "help": "Login to an instance of the Poliglot platform",
+      "hidden": false,
+      "params": [],
+      "path": [
+        "auth",
+        "login"
+      ],
+      "shortHelp": "Login to an instance of the Poliglot platform"
+    },
+    {
+      "deprecated": false,
+      "help": "Revoke (delete) a personal access token.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "UUID of the API key to revoke",
+          "name": "key_id",
+          "opts": [
+            "key_id"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "auth",
+        "revoke-key"
+      ],
+      "shortHelp": "Revoke (delete) a personal access token."
+    },
+    {
+      "deprecated": false,
+      "help": "Synchronize workspace profiles with the local config.",
+      "hidden": false,
+      "params": [],
+      "path": [
+        "auth",
+        "sync"
+      ],
+      "shortHelp": "Synchronize workspace profiles with the..."
+    },
+    {
+      "deprecated": false,
+      "help": "Build package from RDF specification files.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Path to poliglot.yml configuration file. Defaults to poliglot.yml in current directory.",
+          "name": "config_file",
+          "opts": [
+            "--config",
+            "-c"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Skip the validation pipeline. By default `plgt build` runs the same checks as `plgt validate` and aborts on errors \u2014 use this flag for fast packaging when you've validated separately or are knowingly building a partial spec.",
+          "name": "no_validate",
+          "opts": [
+            "--no-validate"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "build"
+      ],
+      "shortHelp": "Build package from RDF specification files."
+    },
+    {
+      "deprecated": false,
+      "help": "Set CLI configuration default.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Set the default workspace.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Point the CLI at a custom Poliglot deployment. Triggers deployment-metadata discovery against {base_url}/.well-known/poliglot.json and caches the OAuth client_id, issuer, and version under [deployment].",
+          "name": "base_url",
+          "opts": [
+            "--base-url"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "configure",
+        "defaults"
+      ],
+      "shortHelp": "Set CLI configuration default."
+    },
+    {
+      "deprecated": false,
+      "help": "Re-run deployment discovery against the currently-configured base URL.\n\nUseful after a deployment upgrades its platform version: this picks\nup any new ``oauth_client_id`` / ``min_cli_version`` values without\nforcing the user to retype the URL.",
+      "hidden": false,
+      "params": [],
+      "path": [
+        "configure",
+        "refresh"
+      ],
+      "shortHelp": "Re-run deployment discovery against the..."
+    },
+    {
+      "deprecated": false,
+      "help": "Create a new matrix extension.\n\nCreates the extension and triggers partial re-deployment of the target matrix.\nThe extension will be marked as 'pending' until the assembly completes.\nRequires workspace admin permissions.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target matrix URI to extend.",
+          "name": "matrix",
+          "opts": [
+            "--matrix",
+            "-m"
+          ],
+          "positional": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Path to Turtle content file.",
+          "name": "file",
+          "opts": [
+            "--file",
+            "-f"
+          ],
+          "positional": false,
+          "required": true,
+          "type": "path"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Optional label for the extension.",
+          "name": "label",
+          "opts": [
+            "--label",
+            "-l"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "extension",
+        "create"
+      ],
+      "shortHelp": "Create a new matrix extension."
+    },
+    {
+      "deprecated": false,
+      "help": "Delete an extension.\n\nTriggers partial re-deployment of the target matrix.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The extension ID.",
+          "name": "extension_id",
+          "opts": [
+            "extension_id"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Skip confirmation prompt.",
+          "name": "yes",
+          "opts": [
+            "--yes",
+            "-y"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "extension",
+        "delete"
+      ],
+      "shortHelp": "Delete an extension."
+    },
+    {
+      "deprecated": false,
+      "help": "Get a single extension by ID.\n\nIf --output is specified, writes the Turtle content to the file.\nOtherwise, displays extension details and content.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The extension ID.",
+          "name": "extension_id",
+          "opts": [
+            "extension_id"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Output file path for the Turtle content.",
+          "name": "output",
+          "opts": [
+            "--output",
+            "-o"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "path"
+        }
+      ],
+      "path": [
+        "extension",
+        "get"
+      ],
+      "shortHelp": "Get a single extension by ID."
+    },
+    {
+      "deprecated": false,
+      "help": "List all matrix extensions in a workspace.\n\nRequires workspace admin permissions.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "extension",
+        "list"
+      ],
+      "shortHelp": "List all matrix extensions in a workspace."
+    },
+    {
+      "deprecated": false,
+      "help": "Update an extension's content and/or label.\n\nAt least one of --file or --label must be provided.\nTriggers partial re-deployment of the target matrix.\nThe extension will be marked as 'pending' until the assembly completes.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The extension ID.",
+          "name": "extension_id",
+          "opts": [
+            "extension_id"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Path to new Turtle content file.",
+          "name": "file",
+          "opts": [
+            "--file",
+            "-f"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "New label for the extension.",
+          "name": "label",
+          "opts": [
+            "--label",
+            "-l"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "extension",
+        "update"
+      ],
+      "shortHelp": "Update an extension's content and/or label."
+    },
+    {
+      "deprecated": false,
+      "help": "Format Turtle and SPARQL files in place.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Files or directories to format. Directories are walked recursively. With no argument, formats the current directory.",
+          "name": "paths",
+          "opts": [
+            "paths"
+          ],
+          "positional": true,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Don't write anything \u2014 exit 1 if any file would change. Mirrors the ergonomics of `ruff format --check` / `prettier --check` for CI use.",
+          "name": "check",
+          "opts": [
+            "--check"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Print a unified diff of every file that would change without writing. Implies --check (no writes).",
+          "name": "diff",
+          "opts": [
+            "--diff"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "format"
+      ],
+      "shortHelp": "Format Turtle and SPARQL files in place."
+    },
+    {
+      "deprecated": false,
+      "help": "Get the SHACL validation report for a command.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The command ID to get the validation report for. Required unless --latest is used.",
+          "name": "command_id",
+          "opts": [
+            "command_id"
+          ],
+          "positional": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Package name. Required when using --latest.",
+          "name": "package_name",
+          "opts": [
+            "--package",
+            "-p"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Get the validation report for the latest command of the package.",
+          "name": "latest",
+          "opts": [
+            "--latest",
+            "-l"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Display formatted report instead of raw Turtle.",
+          "name": "formatted",
+          "opts": [
+            "--formatted",
+            "-f"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "get-lifecycle-validation-report"
+      ],
+      "shortHelp": "Get the SHACL validation report for a..."
+    },
+    {
+      "deprecated": false,
+      "help": "Initialize a new matrix project.\n\nWrites a minimal ``poliglot.yml`` and ``.gitignore`` in the project\ndirectory and (optionally) sets up VS Code integration. Spec authoring\nis left to the user; ``plgt validate`` will run once they add their\nown ``spec/*.ttl`` files.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Project directory. Defaults to current directory.",
+          "name": "directory",
+          "opts": [
+            "--dir",
+            "-d"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "default": null,
+          "flag": true,
+          "help": "Set up VS Code integration (format-on-save for .ttl/.rq, install the poliglot.plgt extension). Without this flag the user is prompted interactively.",
+          "name": "vscode",
+          "opts": [
+            "--vscode"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "init"
+      ],
+      "shortHelp": "Initialize a new matrix project."
+    },
+    {
+      "deprecated": false,
+      "help": "Install a package to a workspace.\n\nTwo invocation shapes, both requiring ``--workspace <slug>`` explicitly\n(no default fallback because pushing to the wrong workspace is the\nhigh-cost surprise):\n\n* ``plgt install --workspace <slug>``: build and push the local package\n  (``poliglot.yml``) to the named workspace. Honours ``--var``,\n  ``--secret-from-env``, ``--config``, ``--release-notes``, ``--force``,\n  and ``--no-attach``.\n* ``plgt install <publisher>/<name>[@<version>] --workspace <slug>``:\n  tell the workspace to install the published registry package.\n  ``--auto-update`` is honoured.\n\nTo populate the local dependency cache, use ``plgt sync``. To add a\ndependency to ``poliglot.yml``, use ``plgt add``.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Optional 'publisher/name[@version]' to install from the matrix registry into the workspace. Omit to build and install the local project package.",
+          "name": "target",
+          "opts": [
+            "target"
+          ],
+          "positional": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Path to poliglot.yml (local-build path only). Defaults to poliglot.yml in the current directory.",
+          "name": "config_file",
+          "opts": [
+            "--config",
+            "-c"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace slug. Required: `plgt install` does not fall back to a default workspace because pushing to the wrong workspace is the high-cost surprise.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Release notes for the installation. Local-build path only \u2014 ignored with a warning on registry installs.",
+          "name": "release_notes",
+          "opts": [
+            "--release-notes"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Force update even if validation fails. Local-build path only \u2014 ignored with a warning on registry installs (the platform auto-detects re-installs and bypasses the gate itself).",
+          "name": "force",
+          "opts": [
+            "--force"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Bind a plgt-build:Variable in REF=VALUE form (repeatable). Local-build: REF is a full URI or 'prefix:localName' QName resolved against the project's matrix TTL prefixes. Registry: REF is a full URI or an unambiguous localName matching one declared variable.",
+          "name": "var",
+          "opts": [
+            "--var"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Bind a plgt-scrt:ManagedSecret in REF=ENV_VAR form (repeatable). Reads the value from the named environment variable and encrypts client-side before sending.",
+          "name": "secret_from_env",
+          "opts": [
+            "--secret-from-env"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Exit with an error if an install for this package is already in progress, instead of silently attaching to it. Works on both paths.",
+          "name": "no_attach",
+          "opts": [
+            "--no-attach"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": true,
+          "help": "Registry-install only. Sets the autoUpdate flag on the resulting PackageInstallation: enabled means future patch versions auto-install, disabled means they don't. Defaults to disabled when omitted; system packages (e.g. poliglot/os) ignore the flag and are always treated as auto-update on by the platform. Ignored with a warning on local-build installs.",
+          "name": "auto_update",
+          "opts": [
+            "--auto-update"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "install"
+      ],
+      "shortHelp": "Install a package to a workspace."
+    },
+    {
+      "deprecated": false,
+      "help": "List the packages you've published under your registry publisher.\n\nDefault output is a compact one-line-per-package table. Use ``--versions`` to expand each\nrow into its version history (yank state visible per version), or ``--json`` to emit the\nraw paged response for scripting. Use ``--page N`` to walk past the first page when your\ncatalog exceeds ``--limit``.",
+      "hidden": false,
+      "params": [
+        {
+          "default": 1,
+          "flag": false,
+          "help": "1-indexed page of results to fetch. Default 1.",
+          "name": "page",
+          "opts": [
+            "--page"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "integer range"
+        },
+        {
+          "default": 50,
+          "flag": false,
+          "help": "Results per page. Capped at 100 server-side regardless of input.",
+          "name": "limit",
+          "opts": [
+            "--limit"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "integer range"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Emit JSON to stdout instead of a human-readable table (machine-readable).",
+          "name": "json_output",
+          "opts": [
+            "--json"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Per-package version detail. Calls /packages/{publisher}/{name}/versions for each row and renders one line per version with its yank state and publish date.",
+          "name": "show_versions",
+          "opts": [
+            "--versions"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "list"
+      ],
+      "shortHelp": "List the packages you've published under..."
+    },
+    {
+      "deprecated": false,
+      "help": "List lifecycle commands for a package.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The package name to list lifecycle commands for.",
+          "name": "package_name",
+          "opts": [
+            "package_name"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": 10,
+          "flag": false,
+          "help": "Maximum number of commands to show.",
+          "name": "limit",
+          "opts": [
+            "--limit",
+            "-n"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "path": [
+        "list-lifecycle-commands"
+      ],
+      "shortHelp": "List lifecycle commands for a package."
+    },
+    {
+      "deprecated": false,
+      "help": "Launch the Language Server Protocol server on stdio.\n\nBlocks until the editor client disconnects. Stdout carries the LSP\nwire protocol; stderr carries diagnostic logs.",
+      "hidden": false,
+      "params": [
+        {
+          "default": false,
+          "flag": true,
+          "help": "Use stdio transport (the default and only supported transport). Accepted for compatibility with LSP clients (e.g. vscode-languageclient) that auto-append `--stdio` when configured for stdio transport.",
+          "name": "stdio",
+          "opts": [
+            "--stdio"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "lsp"
+      ],
+      "shortHelp": "Launch the Language Server Protocol server..."
+    },
+    {
+      "deprecated": false,
+      "help": "Structural diff between two matrix definition graphs.\n\nReports predicates and classes added, removed, or moved between versions. The output is a\nstarting point for authoring a migration \u2014 it is a *heuristic*, not a generator. The author\nstill writes the SPARQL UPDATE; this command just narrows the search.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Path to the older matrix definition.",
+          "name": "from_path",
+          "opts": [
+            "--from"
+          ],
+          "positional": false,
+          "required": true,
+          "type": "path"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Path to the newer matrix definition.",
+          "name": "to_path",
+          "opts": [
+            "--to"
+          ],
+          "positional": false,
+          "required": true,
+          "type": "path"
+        }
+      ],
+      "path": [
+        "migration",
+        "diff"
+      ],
+      "shortHelp": "Structural diff between two matrix..."
+    },
+    {
+      "deprecated": false,
+      "help": "Scaffold a new migration file.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Source version that the migration transforms data away from.",
+          "name": "from_version",
+          "opts": [
+            "--from"
+          ],
+          "positional": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Matrix name (required when poliglot.yml declares more than one).",
+          "name": "matrix",
+          "opts": [
+            "--matrix"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "migration",
+        "new"
+      ],
+      "shortHelp": "Scaffold a new migration file."
+    },
+    {
+      "deprecated": false,
+      "help": "Build the package and publish it to the registry under the caller's publisher.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Path to poliglot.yml. Defaults to poliglot.yml in the current directory.",
+          "name": "config_file",
+          "opts": [
+            "--config",
+            "-c"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Run all validation server-side without uploading or persisting.",
+          "name": "dry_run",
+          "opts": [
+            "--dry-run"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "publish"
+      ],
+      "shortHelp": "Build the package and publish it to the..."
+    },
+    {
+      "deprecated": false,
+      "help": "Remove a dependency from poliglot.yml and sync.\n\nDrops ``publisher/name`` from ``poliglot.yml``'s ``dependencies:``\nmap, then triggers a sync to prune the cache, unless ``--no-sync``\nis passed.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Registry ref 'publisher/name' to remove from poliglot.yml's dependencies.",
+          "name": "target",
+          "opts": [
+            "target"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Skip the local cache sync that normally follows.",
+          "name": "no_sync",
+          "opts": [
+            "--no-sync"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Sync mode for the post-remove sync. Same semantics as `plgt sync`.",
+          "name": "from_workspace",
+          "opts": [
+            "--from-workspace"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Sync mode for the post-remove sync. Same semantics as `plgt sync`.",
+          "name": "from_registry",
+          "opts": [
+            "--from-registry"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "remove"
+      ],
+      "shortHelp": "Remove a dependency from poliglot.yml and..."
+    },
+    {
+      "deprecated": false,
+      "help": "Dump structured metadata for a class, property, or named individual.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Full URI or prefixed name (e.g. `plgt-act:Action`) of the term to describe.",
+          "name": "uri",
+          "opts": [
+            "uri"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Project directory. Defaults to current working directory.",
+          "name": "project_dir",
+          "opts": [
+            "--project-dir",
+            "-d"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Emit JSON instead of pretty output.",
+          "name": "json_output",
+          "opts": [
+            "--json"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Query against the named workspace's cache subtree.",
+          "name": "from_workspace",
+          "opts": [
+            "--from-workspace"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Query against the registry-resolve cache subtree.",
+          "name": "from_registry",
+          "opts": [
+            "--from-registry"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "schema",
+        "describe"
+      ],
+      "shortHelp": "Dump structured metadata for a class,..."
+    },
+    {
+      "deprecated": false,
+      "help": "List every term in the assembled schema, optionally filtered by type.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Restrict to terms whose rdf:type equals this URI.",
+          "name": "type_filter",
+          "opts": [
+            "--filter"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Project directory. Defaults to current working directory.",
+          "name": "project_dir",
+          "opts": [
+            "--project-dir",
+            "-d"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Emit JSON instead of pretty output.",
+          "name": "json_output",
+          "opts": [
+            "--json"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Query against the named workspace's cache subtree.",
+          "name": "from_workspace",
+          "opts": [
+            "--from-workspace"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Query against the registry-resolve cache subtree.",
+          "name": "from_registry",
+          "opts": [
+            "--from-registry"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "schema",
+        "list"
+      ],
+      "shortHelp": "List every term in the assembled schema,..."
+    },
+    {
+      "deprecated": false,
+      "help": "Substring-search labels, definitions, and comments. Case-insensitive.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Substring to search for in labels, definitions, and comments.",
+          "name": "query",
+          "opts": [
+            "query"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Project directory. Defaults to current working directory.",
+          "name": "project_dir",
+          "opts": [
+            "--project-dir",
+            "-d"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Emit JSON instead of pretty output.",
+          "name": "json_output",
+          "opts": [
+            "--json"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Query against the named workspace's cache subtree.",
+          "name": "from_workspace",
+          "opts": [
+            "--from-workspace"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Query against the registry-resolve cache subtree.",
+          "name": "from_registry",
+          "opts": [
+            "--from-registry"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "schema",
+        "search"
+      ],
+      "shortHelp": "Substring-search labels, definitions, and..."
+    },
+    {
+      "deprecated": false,
+      "help": "Get a secret's metadata or value.\n\nBy default shows metadata. Use --value to retrieve the decrypted value.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The secret ID (e.g., matrix:SecretName).",
+          "name": "secret_id",
+          "opts": [
+            "secret_id"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Retrieve and display the decrypted secret value.",
+          "name": "value",
+          "opts": [
+            "--value",
+            "-v"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "secrets",
+        "get"
+      ],
+      "shortHelp": "Get a secret's metadata or value."
+    },
+    {
+      "deprecated": false,
+      "help": "List all secrets in a workspace.\n\nShows secrets defined in matrices with their current value status.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Filter secrets by URI prefix.",
+          "name": "prefix",
+          "opts": [
+            "--prefix",
+            "-p"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "secrets",
+        "list"
+      ],
+      "shortHelp": "List all secrets in a workspace."
+    },
+    {
+      "deprecated": false,
+      "help": "Set a secret's value.\n\nBy default prompts for the value interactively (masked input).\nUse --from-stdin to pipe the value.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The secret ID (e.g., matrix:SecretName).",
+          "name": "secret_id",
+          "opts": [
+            "secret_id"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Read value from stdin instead of interactive prompt.",
+          "name": "from_stdin",
+          "opts": [
+            "--from-stdin"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "secrets",
+        "set"
+      ],
+      "shortHelp": "Set a secret's value."
+    },
+    {
+      "deprecated": false,
+      "help": "Toggle whether a PackageInstallation auto-installs patch versions.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The installed package name.",
+          "name": "package_name",
+          "opts": [
+            "package_name"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "New auto-update flag (true to enable patch auto-install, false to disable).",
+          "name": "auto_update",
+          "opts": [
+            "auto_update"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "set-auto-update"
+      ],
+      "shortHelp": "Toggle whether a PackageInstallation..."
+    },
+    {
+      "deprecated": false,
+      "help": "Sync local dependency cache from poliglot.yml.\n\nReads ``engineVersion`` and ``dependencies:`` from ``poliglot.yml``,\nresolves everything transitively, and populates the per-mode cache\nsubtree under ``.matrix/deps/``. Writes a per-mode lockfile so\nsubsequent runs are deterministic.\n\nTo add a new dependency, use ``plgt add``. To deploy to a workspace,\nuse ``plgt install --workspace <slug>``.",
+      "hidden": false,
+      "params": [
+        {
+          "default": false,
+          "flag": true,
+          "help": "Re-resolve every entry against the current source-of-truth (workspace or registry) and rewrite the lockfile. Cache markers are ignored so packages are re-fetched.",
+          "name": "update",
+          "opts": [
+            "--update"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Sync against the named workspace's installed packages. Pins each declared dep to the version the workspace has; falls back to registry-resolve for deps the workspace doesn't have (emits PLGT_W0902 to flag the pre-push gap). Mutually exclusive with --from-registry. Defaults to the configured default workspace when neither flag is supplied.",
+          "name": "from_workspace",
+          "opts": [
+            "--from-workspace"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Sync from the public registry only (anonymous). Bypasses any default workspace and resolves each dep to the latest version compatible with the project's engineVersion. Mutually exclusive with --from-workspace. Use for OSS-repo CI where the lockfile must be reproducible without workspace state.",
+          "name": "from_registry",
+          "opts": [
+            "--from-registry"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "sync"
+      ],
+      "shortHelp": "Sync local dependency cache from..."
+    },
+    {
+      "deprecated": false,
+      "help": "Build UI component bundles for matrices with components configured.\n\nReads ``poliglot.yml`` and invokes the underlying ``poliglot-ui build``\nonce per matrix that declares ``components:``. Writes the bundle to\n``<matrix>/<outputDir>/dist/components.js`` and the generated TTL to\n``<matrix>/<outputDir>/generated/components.ttl``.\n\nUse ``plgt build`` to run this as part of the full package build \u2014\nthis subcommand exists for the iteration loop when you just want the\nJS bundle rebuilt.\n\nExample:\n    plgt ui build\n    plgt ui build --matrix linear-issues",
+      "hidden": false,
+      "params": [
+        {
+          "default": ".",
+          "flag": false,
+          "help": "Project directory containing poliglot.yml.",
+          "name": "directory",
+          "opts": [
+            "--dir",
+            "-d"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Build only the named matrix. Defaults to every matrix in the project that declares 'components:'.",
+          "name": "matrix",
+          "opts": [
+            "--matrix",
+            "-m"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "ui",
+        "build"
+      ],
+      "shortHelp": "Build UI component bundles for matrices..."
+    },
+    {
+      "deprecated": false,
+      "help": "Start dev server to preview components.\n\nReads poliglot.preview.js config from your project root and serves\na preview app where you can browse and inspect component variants.\n\nExample:\n    plgt ui preview\n    plgt ui preview --port 4000",
+      "hidden": false,
+      "params": [
+        {
+          "default": 3333,
+          "flag": false,
+          "help": "Server port",
+          "name": "port",
+          "opts": [
+            "--port",
+            "-p"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "default": ".",
+          "flag": false,
+          "help": "Project directory",
+          "name": "directory",
+          "opts": [
+            "--dir",
+            "-d"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": "localhost",
+          "flag": false,
+          "help": "Server host",
+          "name": "host",
+          "opts": [
+            "--host"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "ui",
+        "preview"
+      ],
+      "shortHelp": "Start dev server to preview components."
+    },
+    {
+      "deprecated": false,
+      "help": "Uninstall a package from your workspace.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The package name to uninstall.",
+          "name": "package_name",
+          "opts": [
+            "package_name"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Skip confirmation prompt.",
+          "name": "yes",
+          "opts": [
+            "--yes",
+            "-y"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "uninstall"
+      ],
+      "shortHelp": "Uninstall a package from your workspace."
+    },
+    {
+      "deprecated": false,
+      "help": "Unyank a previously-yanked version of your own package.\n\nAdmin-yanked versions (yankedByAdmin=true) cannot be unyanked by the\npublisher \u2014 the server returns a 409 with an explanation.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Package reference in the form <name>@<version>.",
+          "name": "package_ref",
+          "opts": [
+            "package_ref"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "unyank"
+      ],
+      "shortHelp": "Unyank a previously-yanked version of your..."
+    },
+    {
+      "deprecated": false,
+      "help": "Validate a matrix project locally.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Project directory. Defaults to current working directory.",
+          "name": "project_dir",
+          "opts": [
+            "--project-dir",
+            "-d"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Emit one JSON diagnostic per line for machine consumption.",
+          "name": "json_output",
+          "opts": [
+            "--json"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": 10,
+          "flag": false,
+          "help": "Maximum number of resources ((file, subject) buckets) to print to the terminal. Remaining resources overflow to ./.matrix/reports/validate.txt. Use 0 to print all.",
+          "name": "max_resources",
+          "opts": [
+            "--max-resources"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Validate against the per-workspace deps cache populated by `plgt sync --from-workspace <slug>`. Mutually exclusive with --from-registry. Defaults to the configured default workspace if neither flag is passed.",
+          "name": "from_workspace",
+          "opts": [
+            "--from-workspace"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Validate against the registry-resolve deps cache populated by `plgt sync --from-registry`. Mutually exclusive with --from-workspace.",
+          "name": "from_registry",
+          "opts": [
+            "--from-registry"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "validate"
+      ],
+      "shortHelp": "Validate a matrix project locally."
+    },
+    {
+      "deprecated": false,
+      "help": "Returns the currently installed version.",
+      "hidden": false,
+      "params": [],
+      "path": [
+        "version"
+      ],
+      "shortHelp": "Returns the currently installed version."
+    },
+    {
+      "deprecated": false,
+      "help": "Yank a published version so it disappears from default 'latest' resolution.\n\nExact-version installs still resolve the yanked artifact (npm/PEP 592\nsemantics) \u2014 downstream consumers pinned to the version aren't broken.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Package reference in the form <name>@<version>.",
+          "name": "package_ref",
+          "opts": [
+            "package_ref"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Reason for yanking \u2014 shown to consumers of the yanked version.",
+          "name": "reason",
+          "opts": [
+            "--reason",
+            "-r"
+          ],
+          "positional": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Required when yanking the only remaining live version of a package. The server otherwise refuses with 409 \u2014 yanking the last live version effectively retires the package, which is almost never the intent.",
+          "name": "force",
+          "opts": [
+            "--force",
+            "-f"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "yank"
+      ],
+      "shortHelp": "Yank a published version so it disappears..."
+    }
+  ],
+  "schemaVersion": "1.0.0",
+  "version": "0.1.0b4"
+}
