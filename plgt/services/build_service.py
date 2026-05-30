@@ -30,7 +30,7 @@ from plgt.services.rdf_operations import (
     validate_rdf_file,
 )
 from plgt.services.script_expander import expand_script_refs
-from plgt.services.ui_build_service import build_ui_if_needed
+from plgt.services.ui_build_service import build_ui_components
 from plgt.utils.naming import validate_registry_slug
 from plgt.utils.version_range import validate_range
 
@@ -317,6 +317,20 @@ def create_build_config(config_file: Path | None = None) -> PackageConfig:
                 entry=comp_config.get("entry", "index.ts"),
             )
 
+        # Auto-wire UI build outputs when components are configured. The build step
+        # writes the generated TTL under <outputDir>/generated/ and the JS bundle
+        # under <outputDir>/dist/; both need to be picked up by spec/artifact
+        # discovery so the package archive includes them. Skip if the user already
+        # added them explicitly.
+        if components is not None:
+            output_dir_normalized = output_dir_str.rstrip("/")
+            generated_pattern = f"{output_dir_normalized}/generated"
+            dist_pattern = f"{output_dir_normalized}/dist"
+            if generated_pattern not in spec_patterns:
+                spec_patterns = [*spec_patterns, generated_pattern]
+            if dist_pattern not in artifact_patterns:
+                artifact_patterns = [*artifact_patterns, dist_pattern]
+
         matrices.append(
             MatrixBuildConfig(
                 name=matrix_name,
@@ -445,21 +459,22 @@ def build_matrix(
         task = progress.add_task(
             f"[{matrix_config.name}] Building UI components...", total=None
         )
-        ui_result = build_ui_if_needed(matrix_dir, matrix_uri)
-        if ui_result:
-            if ui_result.success:
-                progress.update(
-                    task,
-                    description=f"[{matrix_config.name}] Built {len(ui_result.exports)} component(s)",
-                )
-            else:
-                progress.update(
-                    task,
-                    description=f"[{matrix_config.name}] UI build failed: {ui_result.error}",
-                )
+        ui_result = build_ui_components(
+            matrix_dir=matrix_dir,
+            components_source=str(matrix_config.components.source),
+            components_entry=matrix_config.components.entry,
+            output_dir=matrix_dir / matrix_config.output_dir,
+            matrix_uri=matrix_uri,
+        )
+        if ui_result.success:
+            progress.update(
+                task,
+                description=f"[{matrix_config.name}] Built {len(ui_result.exports)} component(s)",
+            )
         else:
             progress.update(
-                task, description=f"[{matrix_config.name}] No UI components"
+                task,
+                description=f"[{matrix_config.name}] UI build failed: {ui_result.error}",
             )
         progress.remove_task(task)
 
