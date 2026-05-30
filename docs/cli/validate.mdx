@@ -1,0 +1,22 @@
+---
+title: "plgt validate"
+description: "Validate a matrix project locally."
+---
+
+Validate a matrix project locally.
+
+## Synopsis
+
+```bash
+plgt validate [--project-dir <PATH>] [--json] [--max-resources <INTEGER>] [--from-workspace <TEXT>] [--from-registry]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--project-dir` / `-d` | Project directory. Defaults to current working directory. |
+| `--json` | Emit one JSON diagnostic per line for machine consumption. |
+| `--max-resources` | Maximum number of resources ((file, subject) buckets) to print to the terminal. Remaining resources overflow to ./.matrix/reports/validate.txt. Use 0 to print all. Default: `10`. |
+| `--from-workspace` | Validate against the per-workspace deps cache populated by `plgt sync --from-workspace <slug>`. Mutually exclusive with --from-registry. Defaults to the configured default workspace if neither flag is passed. |
+| `--from-registry` | Validate against the registry-resolve deps cache populated by `plgt sync --from-registry`. Mutually exclusive with --from-workspace. |

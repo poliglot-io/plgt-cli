@@ -1,0 +1,23 @@
+---
+title: "plgt yank"
+description: "Yank a published version so it disappears from default 'latest' resolution."
+---
+
+Yank a published version so it disappears from default 'latest' resolution.
+
+Exact-version installs still resolve the yanked artifact (npm/PEP 592
+semantics) — downstream consumers pinned to the version aren't broken.
+
+## Synopsis
+
+```bash
+plgt yank [package_ref <TEXT>] [--reason <TEXT>] [--force]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `package_ref` | Package reference in the form <name>@<version>. |
+| `--reason` / `-r` | Reason for yanking — shown to consumers of the yanked version. |
+| `--force` / `-f` | Required when yanking the only remaining live version of a package. The server otherwise refuses with 409 — yanking the last live version effectively retires the package, which is almost never the intent. |

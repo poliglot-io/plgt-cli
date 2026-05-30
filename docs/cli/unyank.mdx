@@ -1,0 +1,21 @@
+---
+title: "plgt unyank"
+description: "Unyank a previously-yanked version of your own package."
+---
+
+Unyank a previously-yanked version of your own package.
+
+Admin-yanked versions (yankedByAdmin=true) cannot be unyanked by the
+publisher — the server returns a 409 with an explanation.
+
+## Synopsis
+
+```bash
+plgt unyank [package_ref <TEXT>]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `package_ref` | Package reference in the form <name>@<version>. |

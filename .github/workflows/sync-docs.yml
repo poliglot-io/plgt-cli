@@ -1,0 +1,104 @@
+name: Sync docs to poliglot-io/kleo
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag whose docs to sync (e.g. v0.1.0b5).'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Open PR in kleo with refreshed CLI docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout plgt-cli at the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          path: plgt-cli
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install plgt-cli
+        working-directory: plgt-cli
+        run: uv sync --frozen
+
+      - name: Regenerate docs/cli/ from the typer app
+        working-directory: plgt-cli
+        run: uv run python scripts/gen_cli_docs.py
+
+      - name: Checkout kleo (develop)
+        uses: actions/checkout@v4
+        with:
+          repository: poliglot-io/kleo
+          ref: develop
+          token: ${{ secrets.KLEO_DOCS_SYNC_TOKEN }}
+          path: kleo
+
+      - name: Replace kleo's CLI docs with the freshly generated tree
+        run: |
+          set -euo pipefail
+          target="kleo/kleo/frontend/content/docs/cli"
+          rm -rf "$target"
+          mkdir -p "$target"
+          cp -R plgt-cli/docs/cli/. "$target/"
+
+      - name: Check for changes
+        id: diff
+        working-directory: kleo
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open / update PR in kleo
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: kleo
+        env:
+          GH_TOKEN: ${{ secrets.KLEO_DOCS_SYNC_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "poliglot-docs-bot"
+          git config user.email "noreply@poliglot.io"
+
+          branch="docs-sync/plgt-cli-${TAG}"
+          git checkout -B "$branch"
+          git add kleo/frontend/content/docs/cli
+          git commit -m "docs(cli): sync from plgt-cli ${TAG}"
+          git push --force origin "$branch"
+
+          if gh pr view "$branch" --json number >/dev/null 2>&1; then
+            echo "PR already open; force-push refreshed it."
+          else
+            gh pr create \
+              --base develop \
+              --head "$branch" \
+              --title "docs(cli): sync from plgt-cli ${TAG}" \
+              --body "Auto-generated CLI reference from \`poliglot-io/plgt-cli@${TAG}\`. Edit upstream in \`scripts/gen_cli_docs.py\` or the command help text, then publish a new tag."
+          fi

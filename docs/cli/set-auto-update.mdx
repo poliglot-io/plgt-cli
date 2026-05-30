@@ -1,0 +1,20 @@
+---
+title: "plgt set-auto-update"
+description: "Toggle whether a PackageInstallation auto-installs patch versions."
+---
+
+Toggle whether a PackageInstallation auto-installs patch versions.
+
+## Synopsis
+
+```bash
+plgt set-auto-update [package_name <TEXT>] [auto_update <BOOLEAN>] [--workspace <TEXT>]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `package_name` | The installed package name. |
+| `auto_update` | New auto-update flag (true to enable patch auto-install, false to disable). |
+| `--workspace` / `-w` | Target workspace. Uses default workspace if not specified. |

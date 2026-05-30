@@ -1,0 +1,22 @@
+---
+title: "plgt schema search"
+description: "Substring-search labels, definitions, and comments. Case-insensitive."
+---
+
+Substring-search labels, definitions, and comments. Case-insensitive.
+
+## Synopsis
+
+```bash
+plgt schema search [query <TEXT>] [--project-dir <PATH>] [--json] [--from-workspace <TEXT>] [--from-registry]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `query` | Substring to search for in labels, definitions, and comments. |
+| `--project-dir` / `-d` | Project directory. Defaults to current working directory. |
+| `--json` | Emit JSON instead of pretty output. |
+| `--from-workspace` | Query against the named workspace's cache subtree. |
+| `--from-registry` | Query against the registry-resolve cache subtree. |

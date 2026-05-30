@@ -1,0 +1,24 @@
+---
+title: "plgt init"
+description: "Initialize a new matrix project."
+---
+
+Initialize a new matrix project.
+
+Writes a minimal ``poliglot.yml`` and ``.gitignore`` in the project
+directory and (optionally) sets up VS Code integration. Spec authoring
+is left to the user; ``plgt validate`` will run once they add their
+own ``spec/*.ttl`` files.
+
+## Synopsis
+
+```bash
+plgt init [--dir <PATH>] [--vscode]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--dir` / `-d` | Project directory. Defaults to current directory. |
+| `--vscode` / `--no-vscode` | Set up VS Code integration (format-on-save for .ttl/.rq, install the poliglot.plgt extension). Without this flag the user is prompted interactively. |

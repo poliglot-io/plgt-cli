@@ -87,7 +87,7 @@ def build(
 
     Example:
         plgt ui build
-        plgt ui build --matrix linear-issues
+        plgt ui build --matrix tasks
     """
     project_dir = Path(directory).resolve()
     config_path = project_dir / "poliglot.yml"

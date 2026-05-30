@@ -1,0 +1,41 @@
+---
+title: "plgt install"
+description: "Install a package to a workspace."
+---
+
+Install a package to a workspace.
+
+Two invocation shapes, both requiring ``--workspace <slug>`` explicitly
+(no default fallback because pushing to the wrong workspace is the
+high-cost surprise):
+
+* ``plgt install --workspace <slug>``: build and push the local package
+  (``poliglot.yml``) to the named workspace. Honours ``--var``,
+  ``--secret-from-env``, ``--config``, ``--release-notes``, ``--force``,
+  and ``--no-attach``.
+* ``plgt install <publisher>/<name>[@<version>] --workspace <slug>``:
+  tell the workspace to install the published registry package.
+  ``--auto-update`` is honoured.
+
+To populate the local dependency cache, use ``plgt sync``. To add a
+dependency to ``poliglot.yml``, use ``plgt add``.
+
+## Synopsis
+
+```bash
+plgt install [target <TEXT>] [--config <PATH>] [--workspace <TEXT>] [--release-notes <TEXT>] [--force] [--var <TEXT>] [--secret-from-env <TEXT>] [--no-attach] [--auto-update]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `target` | Optional 'publisher/name[@version]' to install from the matrix registry into the workspace. Omit to build and install the local project package. |
+| `--config` / `-c` | Path to poliglot.yml (local-build path only). Defaults to poliglot.yml in the current directory. |
+| `--workspace` / `-w` | Target workspace slug. Required: `plgt install` does not fall back to a default workspace because pushing to the wrong workspace is the high-cost surprise. |
+| `--release-notes` | Release notes for the installation. Local-build path only — ignored with a warning on registry installs. |
+| `--force` | Force update even if validation fails. Local-build path only — ignored with a warning on registry installs (the platform auto-detects re-installs and bypasses the gate itself). |
+| `--var` | Bind a plgt-build:Variable in REF=VALUE form (repeatable). Local-build: REF is a full URI or 'prefix:localName' QName resolved against the project's matrix TTL prefixes. Registry: REF is a full URI or an unambiguous localName matching one declared variable. |
+| `--secret-from-env` | Bind a plgt-scrt:ManagedSecret in REF=ENV_VAR form (repeatable). Reads the value from the named environment variable and encrypts client-side before sending. |
+| `--no-attach` | Exit with an error if an install for this package is already in progress, instead of silently attaching to it. Works on both paths. |
+| `--auto-update` / `--no-auto-update` | Registry-install only. Sets the autoUpdate flag on the resulting PackageInstallation: enabled means future patch versions auto-install, disabled means they don't. Defaults to disabled when omitted; system packages (e.g. poliglot/os) ignore the flag and are always treated as auto-update on by the platform. Ignored with a warning on local-build installs. |

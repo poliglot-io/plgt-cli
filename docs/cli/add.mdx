@@ -1,0 +1,26 @@
+---
+title: "plgt add"
+description: "Add a dependency to poliglot.yml and sync."
+---
+
+Add a dependency to poliglot.yml and sync.
+
+Writes ``publisher/name`` to ``poliglot.yml``'s ``dependencies:`` map
+with a minor-floor range derived from the resolved version (e.g.
+``">=1.5 <2"`` when latest is 1.5.x). Then triggers a sync to
+populate the local cache, unless ``--no-sync`` is passed.
+
+## Synopsis
+
+```bash
+plgt add [target <TEXT>] [--no-sync] [--from-workspace <TEXT>] [--from-registry]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `target` | Registry ref 'publisher/name[@version]' to add to poliglot.yml's dependencies. Omit @version to pin to the latest compatible version's minor floor. |
+| `--no-sync` | Skip the local cache sync that normally follows. Useful when batching multiple adds before a single sync. |
+| `--from-workspace` | Sync mode to use after adding. Same semantics as `plgt sync --from-workspace`. Ignored when --no-sync is passed. |
+| `--from-registry` | Sync mode to use after adding. Same semantics as `plgt sync --from-registry`. Ignored when --no-sync is passed. |

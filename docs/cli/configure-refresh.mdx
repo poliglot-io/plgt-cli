@@ -1,0 +1,16 @@
+---
+title: "plgt configure refresh"
+description: "Re-run deployment discovery against the currently-configured base URL."
+---
+
+Re-run deployment discovery against the currently-configured base URL.
+
+Useful after a deployment upgrades its platform version: this picks
+up any new ``oauth_client_id`` / ``min_cli_version`` values without
+forcing the user to retype the URL.
+
+## Synopsis
+
+```bash
+plgt configure refresh
+```

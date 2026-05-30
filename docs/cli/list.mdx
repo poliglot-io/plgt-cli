@@ -1,0 +1,26 @@
+---
+title: "plgt list"
+description: "List the packages you've published under your registry publisher."
+---
+
+List the packages you've published under your registry publisher.
+
+Default output is a compact one-line-per-package table. Use ``--versions`` to expand each
+row into its version history (yank state visible per version), or ``--json`` to emit the
+raw paged response for scripting. Use ``--page N`` to walk past the first page when your
+catalog exceeds ``--limit``.
+
+## Synopsis
+
+```bash
+plgt list [--page <INTEGER RANGE>] [--limit <INTEGER RANGE>] [--json] [--versions]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--page` | 1-indexed page of results to fetch. Default 1. Default: `1`. |
+| `--limit` | Results per page. Capped at 100 server-side regardless of input. Default: `50`. |
+| `--json` | Emit JSON to stdout instead of a human-readable table (machine-readable). |
+| `--versions` | Per-package version detail. Calls /packages/{publisher}/{name}/versions for each row and renders one line per version with its yank state and publish date. |

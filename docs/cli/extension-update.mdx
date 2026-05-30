@@ -1,0 +1,25 @@
+---
+title: "plgt extension update"
+description: "Update an extension's content and/or label."
+---
+
+Update an extension's content and/or label.
+
+At least one of --file or --label must be provided.
+Triggers partial re-deployment of the target matrix.
+The extension will be marked as 'pending' until the assembly completes.
+
+## Synopsis
+
+```bash
+plgt extension update [extension_id <TEXT>] [--workspace <TEXT>] [--file <PATH>] [--label <TEXT>]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `extension_id` | The extension ID. |
+| `--workspace` / `-w` | Target workspace. Uses default workspace if not specified. |
+| `--file` / `-f` | Path to new Turtle content file. |
+| `--label` / `-l` | New label for the extension. |

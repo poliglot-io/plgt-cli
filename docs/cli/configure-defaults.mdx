@@ -1,0 +1,19 @@
+---
+title: "plgt configure defaults"
+description: "Set CLI configuration default."
+---
+
+Set CLI configuration default.
+
+## Synopsis
+
+```bash
+plgt configure defaults [--workspace <TEXT>] [--base-url <TEXT>]
+```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `--workspace` / `-w` | Set the default workspace. |
+| `--base-url` | Point the CLI at a custom Poliglot deployment. Triggers deployment-metadata discovery against {base_url}/.well-known/poliglot.json and caches the OAuth client_id, issuer, and version under [deployment]. |
