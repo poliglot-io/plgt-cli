@@ -5,3 +5,17 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+
+  - repo: local
+    hooks:
+      # Regenerate surface/cli.json from the typer command tree on every
+      # commit. The script writes only when the output differs, so already-
+      # up-to-date checkouts are a no-op. When it does write, pre-commit
+      # detects the modified file and fails the hook so the contributor
+      # re-stages — same cycle as ruff-format.
+      - id: gen-cli-surface
+        name: Regenerate surface/cli.json
+        entry: uv run python scripts/gen_cli_surface.py
+        language: system
+        pass_filenames: false
+        files: '^(plgt/|scripts/gen_cli_surface\.py$)'
