@@ -141,7 +141,9 @@ def main() -> int:
         return 0
 
     OUTPUT.write_text(serialized)
-    print(f"wrote {OUTPUT.relative_to(OUTPUT.parent.parent)} ({len(surface['commands'])} commands)")
+    print(
+        f"wrote {OUTPUT.relative_to(OUTPUT.parent.parent)} ({len(surface['commands'])} commands)"
+    )
     return 0
 
 
