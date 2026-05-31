@@ -128,8 +128,8 @@ def list_secrets(
 
 @app.command()
 def get(
-    secret_id: str = typer.Argument(
-        ..., help="The secret ID (e.g., matrix:SecretName)."
+    secret_uri: str = typer.Argument(
+        ..., help="The secret URI or QName (e.g., matrix:SecretName)."
     ),
     workspace: str | None = typer.Option(
         None,
@@ -155,25 +155,25 @@ def get(
         if value:
             # Fetch and display the decrypted value
             try:
-                secret_value = client.get_secret_value(target_workspace, secret_id)
+                secret_value = client.get_secret_value(target_workspace, secret_uri)
                 console.print(f"Value: {secret_value}")
             except ResourceNotFoundError:
-                console.print(f"[red]Secret '{secret_id}' not found.[/red]")
+                console.print(f"[red]Secret '{secret_uri}' not found.[/red]")
                 raise typer.Exit(1) from None
             except ServiceError as e:
                 # Check if the secret has no value set
                 if "no value" in str(e).lower():
                     console.print(
-                        f"[yellow]Secret '{secret_id}' has no value set.[/yellow]"
+                        f"[yellow]Secret '{secret_uri}' has no value set.[/yellow]"
                     )
                     raise typer.Exit(1) from None
                 raise
         else:
             # Fetch and display metadata
             try:
-                secret = client.get_secret(target_workspace, secret_id)
+                secret = client.get_secret(target_workspace, secret_uri)
             except ResourceNotFoundError:
-                console.print(f"[red]Secret '{secret_id}' not found.[/red]")
+                console.print(f"[red]Secret '{secret_uri}' not found.[/red]")
                 raise typer.Exit(1) from None
 
             matrix_name = _extract_matrix_name(secret.uri)
@@ -209,8 +209,8 @@ def get(
 
 @app.command(name="set")
 def set_secret(
-    secret_id: str = typer.Argument(
-        ..., help="The secret ID (e.g., matrix:SecretName)."
+    secret_uri: str = typer.Argument(
+        ..., help="The secret URI or QName (e.g., matrix:SecretName)."
     ),
     workspace: str | None = typer.Option(
         None,
@@ -235,9 +235,9 @@ def set_secret(
 
         # Verify the secret exists first
         try:
-            client.get_secret(target_workspace, secret_id)
+            client.get_secret(target_workspace, secret_uri)
         except ResourceNotFoundError:
-            console.print(f"[red]Secret '{secret_id}' not found.[/red]")
+            console.print(f"[red]Secret '{secret_uri}' not found.[/red]")
             raise typer.Exit(1) from None
 
         # Get the value
@@ -262,7 +262,7 @@ def set_secret(
                 raise typer.Exit(1)
 
         # Set the value
-        client.set_secret_value(target_workspace, secret_id, secret_value)
+        client.set_secret_value(target_workspace, secret_uri, secret_value)
         console.print("[green]Secret value updated.[/green]")
 
     except ServiceError as e:

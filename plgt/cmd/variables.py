@@ -55,17 +55,17 @@ def _get_client() -> VariablesClient:
     return VariablesClient(session)
 
 
-def _validate_identifier(variable_id: str) -> None:
-    """Validate that ``variable_id`` is a well-formed full URI or QName.
+def _validate_identifier(variable_uri: str) -> None:
+    """Validate that ``variable_uri`` is a well-formed full URI or QName.
 
     Raises ``ValidationError`` for anything that is neither, so the command
     rejects malformed input before listing the workspace's variables.
     """
-    if "://" in variable_id:
+    if "://" in variable_uri:
         return
-    if not _QNAME_RE.match(variable_id):
+    if not _QNAME_RE.match(variable_uri):
         msg = (
-            f"'{variable_id}' is not a valid variable identifier; expected a "
+            f"'{variable_uri}' is not a valid variable identifier; expected a "
             "full URI (e.g. 'https://example.com/matrix#MyVariable') or a "
             "'prefix:localName' QName (e.g. 'plgt:DefaultFastModel')"
         )
@@ -82,7 +82,7 @@ def _local_name(uri: str) -> str:
     return uri.rsplit("#", 1)[-1].rsplit("/", 1)[-1]
 
 
-def _resolve_variable(variable_id: str, variables: list[Variable]) -> Variable:
+def _resolve_variable(variable_uri: str, variables: list[Variable]) -> Variable:
     """Resolve a full URI or QName to one of the workspace's variables.
 
     A full URI must match a declared variable's ``uri`` exactly. A QName or
@@ -92,23 +92,23 @@ def _resolve_variable(variable_id: str, variables: list[Variable]) -> Variable:
     Raises ``ResourceNotFoundError`` when nothing matches and
     ``ValidationError`` when the local name is ambiguous.
     """
-    if "://" in variable_id:
+    if "://" in variable_uri:
         for variable in variables:
-            if variable.uri == variable_id:
+            if variable.uri == variable_uri:
                 return variable
-        msg = f"Variable '{variable_id}' not found."
+        msg = f"Variable '{variable_uri}' not found."
         raise ResourceNotFoundError(msg)
 
     # QName (prefix:localName) or bare localName: match on the local part.
-    local = variable_id.rsplit(":", 1)[-1]
+    local = variable_uri.rsplit(":", 1)[-1]
     matches = [v for v in variables if _local_name(v.uri) == local]
     if not matches:
-        msg = f"Variable '{variable_id}' not found."
+        msg = f"Variable '{variable_uri}' not found."
         raise ResourceNotFoundError(msg)
     if len(matches) > 1:
         uris = ", ".join(sorted(v.uri for v in matches))
         msg = (
-            f"Variable '{variable_id}' is ambiguous (matches: {uris}); "
+            f"Variable '{variable_uri}' is ambiguous (matches: {uris}); "
             "use the full URI."
         )
         raise ValidationError(msg)
@@ -172,7 +172,7 @@ def list_variables(
 
 @app.command()
 def get(
-    variable_id: str = typer.Argument(
+    variable_uri: str = typer.Argument(
         ..., help="The variable URI or QName (e.g., plgt:DefaultFastModel)."
     ),
     workspace: str | None = typer.Option(
@@ -184,15 +184,15 @@ def get(
 ):
     """Get a variable's metadata and current value."""
     try:
-        _validate_identifier(variable_id)
+        _validate_identifier(variable_uri)
         target_workspace = _get_workspace(workspace)
         client = _get_client()
 
         variables = client.list_variables(target_workspace)
         try:
-            variable = _resolve_variable(variable_id, variables)
+            variable = _resolve_variable(variable_uri, variables)
         except ResourceNotFoundError:
-            console.print(f"[red]Variable '{variable_id}' not found.[/red]")
+            console.print(f"[red]Variable '{variable_uri}' not found.[/red]")
             raise typer.Exit(1) from None
 
         value = variable.value if variable.has_value else "-"
@@ -224,7 +224,7 @@ def get(
 
 @app.command(name="set")
 def set_variable(
-    variable_id: str = typer.Argument(
+    variable_uri: str = typer.Argument(
         ..., help="The variable URI or QName (e.g., plgt:DefaultFastModel)."
     ),
     value: str | None = typer.Argument(
@@ -249,7 +249,7 @@ def set_variable(
     The variable identifier accepts a full URI or a 'prefix:localName' QName.
     """
     try:
-        _validate_identifier(variable_id)
+        _validate_identifier(variable_uri)
 
         if clear and value is not None:
             msg = "Cannot pass both a VALUE and --clear."
@@ -263,13 +263,13 @@ def set_variable(
 
         variables = client.list_variables(target_workspace)
         try:
-            variable = _resolve_variable(variable_id, variables)
+            variable = _resolve_variable(variable_uri, variables)
         except ResourceNotFoundError:
-            console.print(f"[red]Variable '{variable_id}' not found.[/red]")
+            console.print(f"[red]Variable '{variable_uri}' not found.[/red]")
             raise typer.Exit(1) from None
 
         if clear and variable.required:
-            msg = f"Variable '{variable_id}' is required and cannot be cleared."
+            msg = f"Variable '{variable_uri}' is required and cannot be cleared."
             raise ValidationError(msg)
 
         new_value = None if clear else value
