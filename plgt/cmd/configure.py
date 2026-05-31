@@ -21,7 +21,10 @@ def _apply_base_url(url: str) -> None:
     ``min_cli_version``, and writes both ``[defaults] base_url`` and the
     discovered ``[deployment]`` section.
     """
-    if not validators.url(url):
+    # simple_host=True permits hostnames without a public TLD (e.g.
+    # http://localhost:8080), which the default validators.url rejects —
+    # needed so the CLI can target a local platform during development.
+    if not validators.url(url, simple_host=True):
         logger.error("'%s' is not a valid URL.", url)
         raise typer.Abort()  # noqa: RSE102
 

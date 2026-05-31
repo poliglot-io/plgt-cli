@@ -78,6 +78,33 @@ class TestApplyBaseUrl:
             base_url="https://acme.example.com"
         )
 
+    @patch("plgt.cmd.configure.discover")
+    @patch("plgt.cmd.configure.config")
+    def test_accepts_localhost_base_url(self, mock_config, mock_discover):
+        # validators.url is exercised for real here (only discover/config are
+        # mocked) so this guards against the default validator rejecting
+        # hostnames without a public TLD. Local dev points at http://localhost.
+        mock_discover.return_value = _metadata()
+
+        _apply_base_url("http://localhost:8080")
+
+        mock_config.set_defaults.assert_called_once_with(
+            base_url="http://localhost:8080"
+        )
+        mock_config.set_deployment.assert_called_once()
+
+    @patch("plgt.cmd.configure.discover")
+    @patch("plgt.cmd.configure.config")
+    def test_accepts_loopback_ip_base_url(self, mock_config, mock_discover):
+        mock_discover.return_value = _metadata()
+
+        _apply_base_url("http://127.0.0.1:8080")
+
+        mock_config.set_defaults.assert_called_once_with(
+            base_url="http://127.0.0.1:8080"
+        )
+        mock_config.set_deployment.assert_called_once()
+
     @patch("plgt.cmd.configure.config")
     def test_invalid_url_aborts(self, mock_config):
         with pytest.raises(typer.Abort):
