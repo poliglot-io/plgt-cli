@@ -1,7 +1,7 @@
 @prefix bk: <https://example.com/spec/broken#> .
 @prefix plgt: <https://poliglot.io/os/spec#> .
-@prefix plgt-proc: <https://poliglot.io/os/spec/processes#> .
+@prefix plgt-sparql: <https://poliglot.io/os/spec/sparql#> .
 
 
 bk:Req
-    plgt:fromJSON """{ "x": 1 }""" .
+    plgt-sparql:json """{ "x": 1 }""" .

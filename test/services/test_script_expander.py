@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 LIN_ISS = Namespace("https://example.com/spec/issues#")
 PLGT = Namespace("https://poliglot.io/os/spec#")
-PROC = Namespace("https://poliglot.io/os/spec/processes#")
+SPARQL = Namespace("https://poliglot.io/os/spec/sparql#")
 RDFS = Namespace("http://www.w3.org/2000/01/rdf-schema#")
 
 
@@ -29,7 +29,7 @@ def _make_graph_with_prefixes() -> Graph:
     g = Graph()
     g.bind("wgt-iss", LIN_ISS)
     g.bind("plgt", PLGT)
-    g.bind("plgt-proc", PROC)
+    g.bind("plgt-sparql", SPARQL)
     g.bind("rdfs", RDFS)
     return g
 
@@ -55,14 +55,14 @@ class TestExpandBasics:
         g.add(
             (
                 commit,
-                PROC.update,
+                SPARQL.update,
                 URIRef(f"{SCRIPT_SCHEME}scripts/list-issues-commit.rq"),
             )
         )
 
         expand_script_refs(g, tmp_path)
 
-        objects = list(g.objects(commit, PROC.update))
+        objects = list(g.objects(commit, SPARQL.update))
         assert len(objects) == 1
         assert isinstance(objects[0], Literal)
         # The body shouldn't reference wgt-iss: anywhere, so no PREFIX line is emitted.
@@ -82,11 +82,11 @@ class TestExpandBasics:
         other = Namespace("https://example.com/other#")
         g.bind("other", other)
         commit = LIN_ISS["X"]
-        g.add((commit, PROC.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
+        g.add((commit, SPARQL.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
 
         expand_script_refs(g, tmp_path)
 
-        body = str(next(g.objects(commit, PROC.update)))
+        body = str(next(g.objects(commit, SPARQL.update)))
         assert "PREFIX wgt-iss: <https://example.com/spec/issues#>" in body
         assert "other:" not in body
 
@@ -103,11 +103,11 @@ class TestExpandBasics:
 
         g = _make_graph_with_prefixes()
         commit = LIN_ISS["X"]
-        g.add((commit, PROC.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
+        g.add((commit, SPARQL.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
 
         expand_script_refs(g, tmp_path)
 
-        body = str(next(g.objects(commit, PROC.update)))
+        body = str(next(g.objects(commit, SPARQL.update)))
         # No matrix-table PREFIX was prepended — the script's own one already
         # covers wgt-iss:.
         assert body.count("PREFIX wgt-iss:") == 1
@@ -127,11 +127,11 @@ class TestPrefixScanningIgnoresStringsAndComments:
             'INSERT { ?s ?p "wgt-iss:not-a-qname" } WHERE { ?s ?p ?o }\n',
         )
         g = _make_graph_with_prefixes()
-        g.add((LIN_ISS["X"], PROC.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
+        g.add((LIN_ISS["X"], SPARQL.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
 
         expand_script_refs(g, tmp_path)
 
-        body = str(next(g.objects(LIN_ISS["X"], PROC.update)))
+        body = str(next(g.objects(LIN_ISS["X"], SPARQL.update)))
         assert "PREFIX wgt-iss:" not in body
 
     def test_triple_quoted_string_does_not_trigger_prefix(self, tmp_path: Path) -> None:
@@ -141,9 +141,9 @@ class TestPrefixScanningIgnoresStringsAndComments:
             'INSERT { ?s ?p """wgt-iss:stillNotAQname""" } WHERE {}\n',
         )
         g = _make_graph_with_prefixes()
-        g.add((LIN_ISS["X"], PROC.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
+        g.add((LIN_ISS["X"], SPARQL.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
         expand_script_refs(g, tmp_path)
-        body = str(next(g.objects(LIN_ISS["X"], PROC.update)))
+        body = str(next(g.objects(LIN_ISS["X"], SPARQL.update)))
         assert "PREFIX wgt-iss:" not in body
 
     def test_comment_does_not_trigger_prefix(self, tmp_path: Path) -> None:
@@ -153,9 +153,9 @@ class TestPrefixScanningIgnoresStringsAndComments:
             "# Note: wgt-iss:wat — not a real qname use\nSELECT * WHERE { ?s ?p ?o }\n",
         )
         g = _make_graph_with_prefixes()
-        g.add((LIN_ISS["X"], PROC.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
+        g.add((LIN_ISS["X"], SPARQL.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
         expand_script_refs(g, tmp_path)
-        body = str(next(g.objects(LIN_ISS["X"], PROC.update)))
+        body = str(next(g.objects(LIN_ISS["X"], SPARQL.update)))
         assert "PREFIX wgt-iss:" not in body
 
     def test_real_use_still_triggers_prefix(self, tmp_path: Path) -> None:
@@ -168,9 +168,9 @@ class TestPrefixScanningIgnoresStringsAndComments:
             "INSERT { ?s rdfs:label wgt-iss:Issue } WHERE {}\n",
         )
         g = _make_graph_with_prefixes()
-        g.add((LIN_ISS["X"], PROC.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
+        g.add((LIN_ISS["X"], SPARQL.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
         expand_script_refs(g, tmp_path)
-        body = str(next(g.objects(LIN_ISS["X"], PROC.update)))
+        body = str(next(g.objects(LIN_ISS["X"], SPARQL.update)))
         assert "PREFIX wgt-iss: <https://example.com/spec/issues#>" in body
         assert "PREFIX rdfs:" in body
 
@@ -187,9 +187,9 @@ class TestPrefixScanningIgnoresStringsAndComments:
             "SELECT * WHERE { ?s a wgt-iss:Issue }\n",
         )
         g = _make_graph_with_prefixes()
-        g.add((LIN_ISS["X"], PROC.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
+        g.add((LIN_ISS["X"], SPARQL.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
         expand_script_refs(g, tmp_path)
-        body = str(next(g.objects(LIN_ISS["X"], PROC.update)))
+        body = str(next(g.objects(LIN_ISS["X"], SPARQL.update)))
         # The script-local PREFIX must be detected, so the matrix's
         # https://example.com/spec/issues# binding is NOT added on top.
         assert body.count("PREFIX wgt-iss:") == 1
@@ -208,9 +208,9 @@ class TestPrefixScanningIgnoresStringsAndComments:
             "WHERE { ?s a wgt-iss:Issue }\n",
         )
         g = _make_graph_with_prefixes()
-        g.add((LIN_ISS["X"], PROC.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
+        g.add((LIN_ISS["X"], SPARQL.update, URIRef(f"{SCRIPT_SCHEME}scripts/foo.rq")))
         expand_script_refs(g, tmp_path)
-        body = str(next(g.objects(LIN_ISS["X"], PROC.update)))
+        body = str(next(g.objects(LIN_ISS["X"], SPARQL.update)))
         # wgt-iss appears in real use, so the PREFIX is correctly emitted.
         assert "PREFIX wgt-iss:" in body
         # Exactly once — the string-literal use must NOT cause a duplicate.
@@ -225,7 +225,7 @@ class TestExpandValidation:
         g.add(
             (
                 LIN_ISS["X"],
-                PROC.update,
+                SPARQL.update,
                 URIRef(f"{SCRIPT_SCHEME}../evil.rq"),
             )
         )
@@ -237,7 +237,7 @@ class TestExpandValidation:
         g.add(
             (
                 LIN_ISS["X"],
-                PROC.update,
+                SPARQL.update,
                 URIRef(f"{SCRIPT_SCHEME}//shared/foo.rq"),
             )
         )
@@ -249,7 +249,7 @@ class TestExpandValidation:
         g.add(
             (
                 LIN_ISS["X"],
-                PROC.update,
+                SPARQL.update,
                 URIRef(f"{SCRIPT_SCHEME}scripts/foo.sparql"),
             )
         )
@@ -265,7 +265,7 @@ class TestExpandValidation:
         g.add(
             (
                 LIN_ISS["X"],
-                PROC.update,
+                SPARQL.update,
                 URIRef(f"{SCRIPT_SCHEME}/etc/passwd.rq"),
             )
         )
@@ -277,7 +277,7 @@ class TestExpandValidation:
         g.add(
             (
                 LIN_ISS["X"],
-                PROC.update,
+                SPARQL.update,
                 URIRef(f"{SCRIPT_SCHEME}scripts/nonexistent.rq"),
             )
         )
@@ -289,11 +289,11 @@ class TestExpandPreservesUnaffected:
     def test_literal_objects_are_not_touched(self, tmp_path: Path) -> None:
         g = _make_graph_with_prefixes()
         original = Literal("INSERT { ?s ?p ?o } WHERE { ?s ?p ?o }")
-        g.add((LIN_ISS["X"], PROC.update, original))
+        g.add((LIN_ISS["X"], SPARQL.update, original))
 
         expand_script_refs(g, tmp_path)
 
-        objects = list(g.objects(LIN_ISS["X"], PROC.update))
+        objects = list(g.objects(LIN_ISS["X"], SPARQL.update))
         assert objects == [original]
 
     def test_unrelated_predicates_pass_through(self, tmp_path: Path) -> None:
@@ -330,13 +330,13 @@ class TestMultipleRefs:
         )
 
         g = _make_graph_with_prefixes()
-        g.add((LIN_ISS["A"], PROC.update, URIRef(f"{SCRIPT_SCHEME}scripts/a.rq")))
-        g.add((LIN_ISS["B"], PLGT.fromJSON, URIRef(f"{SCRIPT_SCHEME}scripts/b.rq")))
+        g.add((LIN_ISS["A"], SPARQL.update, URIRef(f"{SCRIPT_SCHEME}scripts/a.rq")))
+        g.add((LIN_ISS["B"], SPARQL.json, URIRef(f"{SCRIPT_SCHEME}scripts/b.rq")))
 
         expand_script_refs(g, tmp_path)
 
-        a = str(next(g.objects(LIN_ISS["A"], PROC.update)))
-        b = str(next(g.objects(LIN_ISS["B"], PLGT.fromJSON)))
+        a = str(next(g.objects(LIN_ISS["A"], SPARQL.update)))
+        b = str(next(g.objects(LIN_ISS["B"], SPARQL.json)))
         assert "INSERT" in a
         assert "SELECT" in b
         assert "PREFIX wgt-iss:" in b
@@ -353,11 +353,11 @@ class TestPredicateRegistry:
 
     def test_script_predicates_in_graph_enumeration(self, tmp_path: Path) -> None:
         g = _make_graph_with_prefixes()
-        g.add((LIN_ISS["A"], PROC.update, Literal("...")))
-        g.add((LIN_ISS["B"], PLGT.fromJSON, Literal("...")))
+        g.add((LIN_ISS["A"], SPARQL.update, Literal("...")))
+        g.add((LIN_ISS["B"], SPARQL.json, Literal("...")))
         g.add((LIN_ISS["C"], RDFS.label, Literal("not a sparql body")))
 
         predicates = set(script_predicates_in_graph(g))
-        assert PROC.update in predicates
-        assert PLGT.fromJSON in predicates
+        assert SPARQL.update in predicates
+        assert SPARQL.json in predicates
         assert RDFS.label not in predicates

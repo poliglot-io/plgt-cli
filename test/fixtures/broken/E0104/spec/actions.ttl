@@ -1,7 +1,7 @@
 @prefix bk: <https://example.com/spec/broken#> .
 @prefix plgt: <https://poliglot.io/os/spec#> .
-@prefix plgt-proc: <https://poliglot.io/os/spec/processes#> .
+@prefix plgt-sparql: <https://poliglot.io/os/spec/sparql#> .
 
 
 bk:Req
-    plgt:fromJSON """JSON { "x": ?unboundVar } WHERE { ?_process ?p ?o }""" .
+    plgt-sparql:json """JSON { "x": ?unboundVar } WHERE { ?_process ?p ?o }""" .
