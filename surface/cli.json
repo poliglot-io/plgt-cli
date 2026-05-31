@@ -538,81 +538,6 @@
     },
     {
       "deprecated": false,
-      "help": "Get the SHACL validation report for a command.",
-      "hidden": false,
-      "params": [
-        {
-          "default": null,
-          "flag": false,
-          "help": "The command ID to get the validation report for. Required unless --latest is used.",
-          "name": "command_id",
-          "opts": [
-            "command_id"
-          ],
-          "positional": true,
-          "required": false,
-          "type": "string"
-        },
-        {
-          "default": null,
-          "flag": false,
-          "help": "Package name. Required when using --latest.",
-          "name": "package_name",
-          "opts": [
-            "--package",
-            "-p"
-          ],
-          "positional": false,
-          "required": false,
-          "type": "string"
-        },
-        {
-          "default": false,
-          "flag": true,
-          "help": "Get the validation report for the latest command of the package.",
-          "name": "latest",
-          "opts": [
-            "--latest",
-            "-l"
-          ],
-          "positional": false,
-          "required": false,
-          "type": "boolean"
-        },
-        {
-          "default": null,
-          "flag": false,
-          "help": "Target workspace. Uses default workspace if not specified.",
-          "name": "workspace",
-          "opts": [
-            "--workspace",
-            "-w"
-          ],
-          "positional": false,
-          "required": false,
-          "type": "string"
-        },
-        {
-          "default": false,
-          "flag": true,
-          "help": "Display formatted report instead of raw Turtle.",
-          "name": "formatted",
-          "opts": [
-            "--formatted",
-            "-f"
-          ],
-          "positional": false,
-          "required": false,
-          "type": "boolean"
-        }
-      ],
-      "path": [
-        "get-lifecycle-validation-report"
-      ],
-      "shortHelp": "Get the SHACL validation report for a..."
-    },
-    {
-      "deprecated": false,
       "help": "Initialize a new matrix project.\n\nWrites a minimal ``poliglot.yml`` and ``.gitignore`` in the project\ndirectory and (optionally) sets up VS Code integration. Spec authoring\nis left to the user; ``plgt validate`` will run once they add their\nown ``spec/*.ttl`` files.",
       "hidden": false,
       "params": [
@@ -770,6 +695,132 @@
     },
     {
       "deprecated": false,
+      "help": "Get the SHACL validation report for a command.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The command ID to get the validation report for. Required unless --latest is used.",
+          "name": "command_id",
+          "opts": [
+            "command_id"
+          ],
+          "positional": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Package name. Required when using --latest.",
+          "name": "package_name",
+          "opts": [
+            "--package",
+            "-p"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Get the validation report for the latest command of the package.",
+          "name": "latest",
+          "opts": [
+            "--latest",
+            "-l"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Display formatted report instead of raw Turtle.",
+          "name": "formatted",
+          "opts": [
+            "--formatted",
+            "-f"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "lifecycle",
+        "get-validation-report"
+      ],
+      "shortHelp": "Get the SHACL validation report for a..."
+    },
+    {
+      "deprecated": false,
+      "help": "List lifecycle commands for a package.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The package name to list lifecycle commands for.",
+          "name": "package_name",
+          "opts": [
+            "package_name"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": 10,
+          "flag": false,
+          "help": "Maximum number of commands to show.",
+          "name": "limit",
+          "opts": [
+            "--limit",
+            "-n"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "path": [
+        "lifecycle",
+        "list-commands"
+      ],
+      "shortHelp": "List lifecycle commands for a package."
+    },
+    {
+      "deprecated": false,
       "help": "List the packages you've published under your registry publisher.\n\nDefault output is a compact one-line-per-package table. Use ``--versions`` to expand each\nrow into its version history (yank state visible per version), or ``--json`` to emit the\nraw paged response for scripting. Use ``--page N`` to walk past the first page when your\ncatalog exceeds ``--limit``.",
       "hidden": false,
       "params": [
@@ -826,55 +877,6 @@
         "list"
       ],
       "shortHelp": "List the packages you've published under..."
-    },
-    {
-      "deprecated": false,
-      "help": "List lifecycle commands for a package.",
-      "hidden": false,
-      "params": [
-        {
-          "default": null,
-          "flag": false,
-          "help": "The package name to list lifecycle commands for.",
-          "name": "package_name",
-          "opts": [
-            "package_name"
-          ],
-          "positional": true,
-          "required": true,
-          "type": "string"
-        },
-        {
-          "default": null,
-          "flag": false,
-          "help": "Target workspace. Uses default workspace if not specified.",
-          "name": "workspace",
-          "opts": [
-            "--workspace",
-            "-w"
-          ],
-          "positional": false,
-          "required": false,
-          "type": "string"
-        },
-        {
-          "default": 10,
-          "flag": false,
-          "help": "Maximum number of commands to show.",
-          "name": "limit",
-          "opts": [
-            "--limit",
-            "-n"
-          ],
-          "positional": false,
-          "required": false,
-          "type": "integer"
-        }
-      ],
-      "path": [
-        "list-lifecycle-commands"
-      ],
-      "shortHelp": "List lifecycle commands for a package."
     },
     {
       "deprecated": false,
@@ -1748,6 +1750,129 @@
         "validate"
       ],
       "shortHelp": "Validate a matrix project locally."
+    },
+    {
+      "deprecated": false,
+      "help": "Get a variable's metadata and current value.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The variable URI or QName (e.g., plgt:DefaultFastModel).",
+          "name": "variable_id",
+          "opts": [
+            "variable_id"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "variables",
+        "get"
+      ],
+      "shortHelp": "Get a variable's metadata and current value."
+    },
+    {
+      "deprecated": false,
+      "help": "List all variables in a workspace.\n\nShows variables declared by matrices with their current value status.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "path": [
+        "variables",
+        "list"
+      ],
+      "shortHelp": "List all variables in a workspace."
+    },
+    {
+      "deprecated": false,
+      "help": "Set a variable's value.\n\nProvide a VALUE to set, or pass --clear to unset an optional variable.\nThe variable identifier accepts a full URI or a 'prefix:localName' QName.",
+      "hidden": false,
+      "params": [
+        {
+          "default": null,
+          "flag": false,
+          "help": "The variable URI or QName (e.g., plgt:DefaultFastModel).",
+          "name": "variable_id",
+          "opts": [
+            "variable_id"
+          ],
+          "positional": true,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "The value to set. Omit when using --clear.",
+          "name": "value",
+          "opts": [
+            "value"
+          ],
+          "positional": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Target workspace. Uses default workspace if not specified.",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "flag": true,
+          "help": "Clear the variable's value (sends null). Only optional variables can be cleared.",
+          "name": "clear",
+          "opts": [
+            "--clear"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": [
+        "variables",
+        "set"
+      ],
+      "shortHelp": "Set a variable's value."
     },
     {
       "deprecated": false,

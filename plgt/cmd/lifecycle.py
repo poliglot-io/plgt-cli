@@ -51,6 +51,14 @@ app = typer.Typer(
     pretty_exceptions_enable=False,
 )
 
+# Read-only lifecycle inspection commands live under their own `lifecycle`
+# group (`plgt lifecycle list-commands`, `plgt lifecycle get-validation-report`)
+# so the top-level surface isn't cluttered with long compound verbs.
+lifecycle_app = typer.Typer(
+    help="Inspect lifecycle commands and their validation reports.",
+    pretty_exceptions_enable=False,
+)
+
 
 @app.command()
 def build(
@@ -1090,7 +1098,7 @@ def set_auto_update(
         raise typer.Exit(1) from e
 
 
-@app.command(name="list-lifecycle-commands")
+@lifecycle_app.command(name="list-commands")
 def list_lifecycle_commands(
     package_name: str = typer.Argument(
         ..., help="The package name to list lifecycle commands for."
@@ -1170,7 +1178,7 @@ def list_lifecycle_commands(
         raise typer.Exit(1) from e
 
 
-@app.command(name="get-lifecycle-validation-report")
+@lifecycle_app.command(name="get-validation-report")
 def get_lifecycle_validation_report(
     command_id: str | None = typer.Argument(
         None,

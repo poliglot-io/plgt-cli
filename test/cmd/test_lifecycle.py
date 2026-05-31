@@ -1,7 +1,7 @@
 """Unit tests for lifecycle commands.
 
-Tests cover install, list-lifecycle-commands, get-lifecycle-validation-report,
-and uninstall CLI commands.
+Tests cover install, the `lifecycle list-commands` and
+`lifecycle get-validation-report` group commands, and uninstall.
 """
 
 import textwrap
@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from plgt.cmd.lifecycle import app
+from plgt.cmd.lifecycle import app, lifecycle_app
 from plgt.core.exceptions import ConflictError, ResourceNotFoundError, ValidationError
 from plgt.models.lifecycle_command import (
     LifecycleCommand,
@@ -527,7 +527,7 @@ class TestInstall:
 
 
 class TestListLifecycleCommands:
-    """Test list-lifecycle-commands command."""
+    """Test the `lifecycle list-commands` command."""
 
     @patch("plgt.cmd.lifecycle.LifecycleCommandClient")
     @patch("plgt.cmd.lifecycle.config")
@@ -561,7 +561,7 @@ class TestListLifecycleCommands:
             ),
         ]
 
-        result = runner.invoke(app, ["list-lifecycle-commands", "test-package"])
+        result = runner.invoke(lifecycle_app, ["list-commands", "test-package"])
 
         assert result.exit_code == 0
         assert "dep-1" in result.stdout
@@ -582,8 +582,8 @@ class TestListLifecycleCommands:
         mock_client.list_commands.return_value = []
 
         result = runner.invoke(
-            app,
-            ["list-lifecycle-commands", "test-package", "--workspace", "my-workspace"],
+            lifecycle_app,
+            ["list-commands", "test-package", "--workspace", "my-workspace"],
         )
 
         assert result.exit_code == 0
@@ -605,8 +605,8 @@ class TestListLifecycleCommands:
         mock_client.list_commands.return_value = []
 
         result = runner.invoke(
-            app,
-            ["list-lifecycle-commands", "test-package", "--limit", "5"],
+            lifecycle_app,
+            ["list-commands", "test-package", "--limit", "5"],
         )
 
         assert result.exit_code == 0
@@ -619,7 +619,7 @@ class TestListLifecycleCommands:
         """Test error when no workspace configured."""
         mock_config.defaults.get.return_value = None
 
-        result = runner.invoke(app, ["list-lifecycle-commands", "test-package"])
+        result = runner.invoke(lifecycle_app, ["list-commands", "test-package"])
 
         assert result.exit_code == 1
         assert "No workspace" in result.stdout
@@ -632,7 +632,7 @@ class TestListLifecycleCommands:
         mock_config.get_session.return_value = mock_session
         mock_config.defaults.get.return_value = "test-workspace"
 
-        result = runner.invoke(app, ["list-lifecycle-commands", "test-package"])
+        result = runner.invoke(lifecycle_app, ["list-commands", "test-package"])
 
         assert result.exit_code == 1
         assert "Not authenticated" in result.stdout
@@ -650,7 +650,7 @@ class TestListLifecycleCommands:
         mock_client_class.return_value = mock_client
         mock_client.list_commands.return_value = []
 
-        result = runner.invoke(app, ["list-lifecycle-commands", "test-package"])
+        result = runner.invoke(lifecycle_app, ["list-commands", "test-package"])
 
         assert result.exit_code == 0
         assert "No commands found" in result.stdout
@@ -679,7 +679,7 @@ class TestListLifecycleCommands:
             )
         ]
 
-        result = runner.invoke(app, ["list-lifecycle-commands", "test-package"])
+        result = runner.invoke(lifecycle_app, ["list-commands", "test-package"])
 
         assert result.exit_code == 0
         assert "FAILED" in result.stdout
@@ -687,7 +687,7 @@ class TestListLifecycleCommands:
 
 
 class TestGetLifecycleValidationReport:
-    """Test get-lifecycle-validation-report command."""
+    """Test the `lifecycle get-validation-report` command."""
 
     @patch("plgt.cmd.lifecycle.LifecycleCommandClient")
     @patch("plgt.cmd.lifecycle.config")
@@ -707,7 +707,7 @@ class TestGetLifecycleValidationReport:
         mock_client_class.return_value = mock_client
         mock_client.get_validation_report.return_value = ttl_content
 
-        result = runner.invoke(app, ["get-lifecycle-validation-report", "dep-123"])
+        result = runner.invoke(lifecycle_app, ["get-validation-report", "dep-123"])
 
         assert result.exit_code == 0
         assert "sh:ValidationReport" in result.stdout
@@ -737,9 +737,9 @@ class TestGetLifecycleValidationReport:
         mock_client.get_validation_report.return_value = "@prefix sh: <...> ."
 
         result = runner.invoke(
-            app,
+            lifecycle_app,
             [
-                "get-lifecycle-validation-report",
+                "get-validation-report",
                 "--latest",
                 "--package",
                 "test-package",
@@ -760,7 +760,7 @@ class TestGetLifecycleValidationReport:
         mock_config.get_session.return_value = mock_session
         mock_config.defaults.get.return_value = "test-workspace"
 
-        result = runner.invoke(app, ["get-lifecycle-validation-report", "--latest"])
+        result = runner.invoke(lifecycle_app, ["get-validation-report", "--latest"])
 
         assert result.exit_code == 1
         assert "--package is required" in result.stdout
@@ -773,7 +773,7 @@ class TestGetLifecycleValidationReport:
         mock_config.get_session.return_value = mock_session
         mock_config.defaults.get.return_value = "test-workspace"
 
-        result = runner.invoke(app, ["get-lifecycle-validation-report"])
+        result = runner.invoke(lifecycle_app, ["get-validation-report"])
 
         assert result.exit_code == 1
         assert "command ID" in result.stdout or "--latest" in result.stdout
@@ -783,7 +783,7 @@ class TestGetLifecycleValidationReport:
         """Test error when no workspace configured."""
         mock_config.defaults.get.return_value = None
 
-        result = runner.invoke(app, ["get-lifecycle-validation-report", "dep-123"])
+        result = runner.invoke(lifecycle_app, ["get-validation-report", "dep-123"])
 
         assert result.exit_code == 1
         assert "No workspace" in result.stdout
@@ -796,7 +796,7 @@ class TestGetLifecycleValidationReport:
         mock_config.get_session.return_value = mock_session
         mock_config.defaults.get.return_value = "test-workspace"
 
-        result = runner.invoke(app, ["get-lifecycle-validation-report", "dep-123"])
+        result = runner.invoke(lifecycle_app, ["get-validation-report", "dep-123"])
 
         assert result.exit_code == 1
         assert "Not authenticated" in result.stdout
@@ -814,7 +814,7 @@ class TestGetLifecycleValidationReport:
         mock_client_class.return_value = mock_client
         mock_client.get_validation_report.return_value = None
 
-        result = runner.invoke(app, ["get-lifecycle-validation-report", "dep-123"])
+        result = runner.invoke(lifecycle_app, ["get-validation-report", "dep-123"])
 
         assert result.exit_code == 0
         assert "No validation report found" in result.stdout
@@ -835,9 +835,9 @@ class TestGetLifecycleValidationReport:
         mock_client.list_commands.return_value = []
 
         result = runner.invoke(
-            app,
+            lifecycle_app,
             [
-                "get-lifecycle-validation-report",
+                "get-validation-report",
                 "--latest",
                 "--package",
                 "test-package",
@@ -860,9 +860,9 @@ class TestGetLifecycleValidationReport:
         mock_client.get_validation_report.return_value = "@prefix sh: <...> ."
 
         result = runner.invoke(
-            app,
+            lifecycle_app,
             [
-                "get-lifecycle-validation-report",
+                "get-validation-report",
                 "dep-123",
                 "--workspace",
                 "my-workspace",
@@ -892,8 +892,8 @@ class TestGetLifecycleValidationReport:
         mock_client.get_validation_report.return_value = ttl_content
 
         result = runner.invoke(
-            app,
-            ["get-lifecycle-validation-report", "dep-123", "--formatted"],
+            lifecycle_app,
+            ["get-validation-report", "dep-123", "--formatted"],
         )
 
         assert result.exit_code == 0
