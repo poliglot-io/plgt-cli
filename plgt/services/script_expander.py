@@ -50,10 +50,20 @@ SCRIPT_SCHEME = "script://"
 # changes are needed beyond registering the URI here.
 SPARQL_BEARING_PREDICATES: frozenset[URIRef] = frozenset(
     {
-        URIRef("https://poliglot.io/os/spec/processes#update"),
-        URIRef("https://poliglot.io/os/spec#fromJSON"),
-        URIRef("https://poliglot.io/os/spec#fromValue"),
-        URIRef("https://poliglot.io/os/spec/processes#json"),
+        # plgt-sparql Runnable form subproperties (all rdfs:subPropertyOf
+        # plgt-sparql:sparql). The Script/Query/ValueFunction/JSONFunction
+        # families moved out of plgt-proc / plgt into the plgt-sparql matrix;
+        # their SPARQL content is carried on these form-specific predicates.
+        URIRef("https://poliglot.io/os/spec/sparql#sparql"),
+        URIRef("https://poliglot.io/os/spec/sparql#select"),
+        URIRef("https://poliglot.io/os/spec/sparql#ask"),
+        URIRef("https://poliglot.io/os/spec/sparql#construct"),
+        URIRef("https://poliglot.io/os/spec/sparql#describe"),
+        URIRef("https://poliglot.io/os/spec/sparql#update"),
+        URIRef("https://poliglot.io/os/spec/sparql#json"),
+        URIRef("https://poliglot.io/os/spec/sparql#define"),
+        URIRef("https://poliglot.io/os/spec/sparql#value"),
+        # IAM condition SPARQL is a separate property that did not move.
         URIRef("https://poliglot.io/os/spec/iam#sparql"),
     }
 )

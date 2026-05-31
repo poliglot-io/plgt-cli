@@ -470,10 +470,10 @@ class TestSparqlSyntax:
                 "@base <https://example.com/test#> .\n"
                 "@prefix plgt-mtx: <https://poliglot.io/os/spec/matrix#> .\n"
                 "@prefix plgt: <https://poliglot.io/os/spec#> .\n"
-                "@prefix plgt-proc: <https://poliglot.io/os/spec/processes#> .\n"
+                "@prefix plgt-sparql: <https://poliglot.io/os/spec/sparql#> .\n"
                 "<https://example.com/test#> a plgt-mtx:Matrix .\n"
                 "<https://example.com/test#Commit> "
-                "plgt-proc:update <script://scripts/broken.rq> .\n"
+                "plgt-sparql:update <script://scripts/broken.rq> .\n"
             ),
             scripts={"scripts/broken.rq": "THIS IS NOT VALID SPARQL\n"},
         )
@@ -669,9 +669,9 @@ class TestPredicateAndClassExistence:
                 "actions.ttl": (
                     "@prefix ex: <https://example.com/test#> .\n"
                     "@prefix plgt: <https://poliglot.io/os/spec#> .\n"
-                    "@prefix plgt-proc: <https://poliglot.io/os/spec/processes#> .\n"
+                    "@prefix plgt-sparql: <https://poliglot.io/os/spec/sparql#> .\n"
                     "ex:Find a plgt:Action ;\n"
-                    '    plgt:fromValue """\n'
+                    '    plgt-sparql:select """\n'
                     "        SELECT ?s WHERE { ?s ex:hasStateType ?o }\n"
                     '    """ .\n'
                 )
@@ -681,11 +681,11 @@ class TestPredicateAndClassExistence:
         (engine_dir / "ontology.ttl").write_text(
             "@prefix ex: <https://example.com/test#> .\n"
             "@prefix plgt: <https://poliglot.io/os/spec#> .\n"
-            "@prefix plgt-proc: <https://poliglot.io/os/spec/processes#> .\n"
+            "@prefix plgt-sparql: <https://poliglot.io/os/spec/sparql#> .\n"
             "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
             'ex:hasState rdfs:label "has state" .\n'
             'plgt:Action rdfs:label "Action" .\n'
-            'plgt:fromValue rdfs:label "from value" .\n'
+            'plgt-sparql:select rdfs:label "select" .\n'
         )
 
         result = validate_project(proj)
@@ -708,7 +708,7 @@ class TestGrelFunctionCalls:
                 "actions.ttl": (
                     "@prefix ex: <https://example.com/test#> .\n"
                     "@prefix plgt: <https://poliglot.io/os/spec#> .\n"
-                    "@prefix plgt-proc: <https://poliglot.io/os/spec/processes#> .\n"
+                    "@prefix plgt-sparql: <https://poliglot.io/os/spec/sparql#> .\n"
                     "ex:Handler plgt:executesFunction ex:nonexistent_function .\n"
                 )
             },
@@ -727,7 +727,7 @@ class TestGrelFunctionCalls:
                 "actions.ttl": (
                     "@prefix ex: <https://example.com/test#> .\n"
                     "@prefix plgt: <https://poliglot.io/os/spec#> .\n"
-                    "@prefix plgt-proc: <https://poliglot.io/os/spec/processes#> .\n"
+                    "@prefix plgt-sparql: <https://poliglot.io/os/spec/sparql#> .\n"
                     "ex:Handler plgt:executesFunction ex:concat .\n"
                 )
             },
