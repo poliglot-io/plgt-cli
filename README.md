@@ -18,42 +18,29 @@ Requires Python 3.12.x. [`uv`](https://docs.astral.sh/uv/) is the recommended in
 uv tool install plgt
 ```
 
-## Usage
+## Quickstart
 
 ```bash
-plgt --help
-
-plgt version              # Show version
-plgt init                 # Initialize a new workspace
-plgt auth login           # Authenticate via OAuth
-plgt configure            # Configure workspace settings
-plgt lifecycle            # Manage matrix lifecycle
-plgt extension            # Manage extensions
-plgt secrets              # Manage secrets
-plgt ui                   # UI tooling (delegates to poliglot-ui)
+plgt --help                       # list every command
+plgt auth login                   # authenticate against a workspace
+plgt init my-matrix && cd my-matrix
+plgt validate                     # run the validation pipeline
+plgt build                        # produce the package tarball
+plgt install --workspace dev      # ship it to a workspace
 ```
 
-## Development
-
-Requires [uv](https://docs.astral.sh/uv/) and Python 3.12.
-
-```bash
-uv sync                       # install deps
-uv run pytest                 # tests
-uv run ruff check             # lint
-uv run ruff format            # format
-```
+Each command has its own page in the [CLI reference](https://poliglot.io/docs/cli), auto-generated from this repo's source on every release.
 
 ## Documentation
 
-- CLI reference: <https://poliglot.io/docs/cli>
-- Full docs: <https://poliglot.io/docs>
+- [CLI reference](https://poliglot.io/docs/cli) — every command's flags, defaults, and help text, auto-generated from this repo.
+- [Full Poliglot docs](https://poliglot.io/docs)
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). All contributors must sign the [Poliglot Contributor License Agreement](https://poliglot.io/cla) before their first PR is merged.
+Local setup, test commands, and the PR workflow live in [CONTRIBUTING.md](CONTRIBUTING.md). All contributors must sign the [Poliglot Contributor License Agreement](https://poliglot.io/cla) before their first PR is merged.
 
-Bugs and feature requests go through GitHub Issues; security issues use [private security advisories](https://github.com/poliglot-io/plgt-cli/security/advisories/new) — see [SECURITY.md](SECURITY.md).
+Bugs and feature requests: GitHub Issues. Security issues: [private security advisories](https://github.com/poliglot-io/plgt-cli/security/advisories/new) (see [SECURITY.md](SECURITY.md)).
 
 ## License
 
