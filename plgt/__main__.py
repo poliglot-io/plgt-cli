@@ -12,6 +12,7 @@ from plgt.cmd.extensions import app as extensions_app
 from plgt.cmd.format import app as format_app
 from plgt.cmd.init import init_command
 from plgt.cmd.lifecycle import app
+from plgt.cmd.lifecycle import lifecycle_app
 from plgt.cmd.lsp import lsp_command
 from plgt.cmd.migration import app as migration_app
 from plgt.cmd.publish import app as publish_app
@@ -19,6 +20,7 @@ from plgt.cmd.schema import app as schema_app
 from plgt.cmd.secrets import app as secrets_app
 from plgt.cmd.ui import app as ui_app
 from plgt.cmd.validate import app as validate_app
+from plgt.cmd.variables import app as variables_app
 from plgt.core import settings
 from plgt.core.exceptions import CLIError
 from plgt.core.logs import console, setup_file_logging
@@ -105,9 +107,11 @@ app.add_typer(config_app, name="configure")
 app.add_typer(auth_app, name="auth")
 app.add_typer(extensions_app, name="extension")
 app.command(name="lsp")(lsp_command)
+app.add_typer(lifecycle_app, name="lifecycle")
 app.add_typer(migration_app, name="migration")
 app.add_typer(schema_app, name="schema")
 app.add_typer(secrets_app, name="secrets")
+app.add_typer(variables_app, name="variables")
 app.add_typer(ui_app, name="ui")
 app.add_typer(validate_app, name="validate")
 app.add_typer(format_app, name="format")
