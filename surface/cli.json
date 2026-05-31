@@ -1295,10 +1295,10 @@
         {
           "default": null,
           "flag": false,
-          "help": "The secret ID (e.g., matrix:SecretName).",
-          "name": "secret_id",
+          "help": "The secret URI or QName (e.g., matrix:SecretName).",
+          "name": "secret_uri",
           "opts": [
-            "secret_id"
+            "secret_uri"
           ],
           "positional": true,
           "required": true,
@@ -1383,10 +1383,10 @@
         {
           "default": null,
           "flag": false,
-          "help": "The secret ID (e.g., matrix:SecretName).",
-          "name": "secret_id",
+          "help": "The secret URI or QName (e.g., matrix:SecretName).",
+          "name": "secret_uri",
           "opts": [
-            "secret_id"
+            "secret_uri"
           ],
           "positional": true,
           "required": true,
@@ -1760,9 +1760,9 @@
           "default": null,
           "flag": false,
           "help": "The variable URI or QName (e.g., plgt:DefaultFastModel).",
-          "name": "variable_id",
+          "name": "variable_uri",
           "opts": [
-            "variable_id"
+            "variable_uri"
           ],
           "positional": true,
           "required": true,
@@ -1822,9 +1822,9 @@
           "default": null,
           "flag": false,
           "help": "The variable URI or QName (e.g., plgt:DefaultFastModel).",
-          "name": "variable_id",
+          "name": "variable_uri",
           "opts": [
-            "variable_id"
+            "variable_uri"
           ],
           "positional": true,
           "required": true,
