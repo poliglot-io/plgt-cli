@@ -386,6 +386,26 @@ class TestSet:
         assert "Failed to set secret" in result.output
 
 
+class TestArgumentNames:
+    """Verify the identifier argument is surfaced as a URI, not an ID."""
+
+    def test_get_help_uses_secret_uri(self):
+        """Test get exposes the identifier as SECRET_URI in --help."""
+        result = runner.invoke(app, ["get", "--help"])
+
+        assert result.exit_code == 0
+        assert "SECRET_URI" in result.output
+        assert "URI or QName" in result.output
+
+    def test_set_help_uses_secret_uri(self):
+        """Test set exposes the identifier as SECRET_URI in --help."""
+        result = runner.invoke(app, ["set", "--help"])
+
+        assert result.exit_code == 0
+        assert "SECRET_URI" in result.output
+        assert "URI or QName" in result.output
+
+
 class TestExtractMatrixName:
     """Test URI parsing for matrix name extraction."""
 

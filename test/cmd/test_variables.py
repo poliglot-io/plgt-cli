@@ -337,6 +337,26 @@ class TestSet:
         assert "Failed to set variable" in result.output
 
 
+class TestArgumentNames:
+    """Verify the identifier argument is surfaced as a URI, not an ID."""
+
+    def test_get_help_uses_variable_uri(self):
+        """Test get exposes the identifier as VARIABLE_URI in --help."""
+        result = runner.invoke(app, ["get", "--help"])
+
+        assert result.exit_code == 0
+        assert "VARIABLE_URI" in result.output
+        assert "URI or QName" in result.output
+
+    def test_set_help_uses_variable_uri(self):
+        """Test set exposes the identifier as VARIABLE_URI in --help."""
+        result = runner.invoke(app, ["set", "--help"])
+
+        assert result.exit_code == 0
+        assert "VARIABLE_URI" in result.output
+        assert "URI or QName" in result.output
+
+
 class TestIdentifierValidation:
     """Direct coverage of the local identifier validation helper."""
 
