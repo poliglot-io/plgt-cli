@@ -56,6 +56,10 @@ class TT(str, Enum):
     NEWLINE = "newline"  # \n (only emitted when there's a blank line — see below)
     KEYWORD = "keyword"  # SPARQL keywords (SELECT, WHERE, ...); upper-case canonical
     IDENT = "ident"  # bare identifier (rare; used for SPARQL functions etc.)
+    QT_OPEN = "qt-open"  # <<  — RDF-star quoted/reifier triple open
+    QT_CLOSE = "qt-close"  # >>  — RDF-star quoted/reifier triple close
+    TT_OPEN = "tt-open"  # <<(  — RDF-star triple-term open
+    TT_CLOSE = "tt-close"  # )>>  — RDF-star triple-term close
     PATH_OP = "path-op"  # / | ^ * + ?  in SPARQL property paths
     OP = (
         "op"  # operators inside FILTER/BIND expressions: = != < <= > >= && || ! + - * /
@@ -395,6 +399,53 @@ def tokenize(source: str, *, sparql_mode: bool = False) -> list[Token]:
             line += _segment.count("\n")
             col = col + (end - i)
             i = end
+            continue
+
+        # RDF-star delimiters (SPARQL 1.2 / RDF-star). These are atomic and
+        # must be recognised before the single-char ``<`` IRI / ``>`` operator
+        # and ``)`` punctuation branches, otherwise the IRI reader would
+        # greedily swallow ``<<`` as the start of an ``<...>`` IRI and the
+        # operator pass would split ``>>`` into two ``>`` tokens. The inner
+        # ``s p o`` terms tokenise normally between the open and close.
+        #
+        # Triple-term open ``<<(`` must be tested before reifier open ``<<``
+        # (longer match wins); likewise triple-term close ``)>>`` before the
+        # bare ``)`` punctuation, and reifier close ``>>`` is its own token.
+        if source[i : i + 3] == "<<(":
+            tokens.append(
+                Token(TT.TT_OPEN, "<<(", line, col, blank_lines_since_last_token)
+            )
+            blank_lines_since_last_token = 0
+            newline_since_last_token = False
+            col += 3
+            i += 3
+            continue
+        if source[i : i + 2] == "<<":
+            tokens.append(
+                Token(TT.QT_OPEN, "<<", line, col, blank_lines_since_last_token)
+            )
+            blank_lines_since_last_token = 0
+            newline_since_last_token = False
+            col += 2
+            i += 2
+            continue
+        if source[i : i + 3] == ")>>":
+            tokens.append(
+                Token(TT.TT_CLOSE, ")>>", line, col, blank_lines_since_last_token)
+            )
+            blank_lines_since_last_token = 0
+            newline_since_last_token = False
+            col += 3
+            i += 3
+            continue
+        if source[i : i + 2] == ">>":
+            tokens.append(
+                Token(TT.QT_CLOSE, ">>", line, col, blank_lines_since_last_token)
+            )
+            blank_lines_since_last_token = 0
+            newline_since_last_token = False
+            col += 2
+            i += 2
             continue
 
         # IRI.
