@@ -1559,13 +1559,13 @@
     },
     {
       "deprecated": false,
-      "help": "Start dev server to preview components.\n\nReads poliglot.preview.js config from your project root and serves\na preview app where you can browse and inspect component variants.\n\nExample:\n    plgt ui preview\n    plgt ui preview --port 4000",
+      "help": "Launch Storybook to preview components.\n\nStarts the project's local Storybook so you can browse and inspect\ncomponent variants. The project must have Storybook installed and a\n``.storybook`` config; the underlying command resolves the project's\nlocal storybook. When ``--port`` is omitted, an open port in the\nStorybook range is selected automatically.\n\nExample:\n    plgt ui preview\n    plgt ui preview --port 6010",
       "hidden": false,
       "params": [
         {
-          "default": 3333,
+          "default": null,
           "flag": false,
-          "help": "Server port",
+          "help": "Port (defaults to the first open port in the Storybook range)",
           "name": "port",
           "opts": [
             "--port",
@@ -1587,25 +1587,13 @@
           "positional": false,
           "required": false,
           "type": "string"
-        },
-        {
-          "default": "localhost",
-          "flag": false,
-          "help": "Server host",
-          "name": "host",
-          "opts": [
-            "--host"
-          ],
-          "positional": false,
-          "required": false,
-          "type": "string"
         }
       ],
       "path": [
         "ui",
         "preview"
       ],
-      "shortHelp": "Start dev server to preview components."
+      "shortHelp": "Launch Storybook to preview components."
     },
     {
       "deprecated": false,
