@@ -16,18 +16,25 @@ app = typer.Typer(help="UI component development commands")
 
 @app.command()
 def preview(
-    port: int = typer.Option(3333, "--port", "-p", help="Server port"),
+    port: int | None = typer.Option(
+        None,
+        "--port",
+        "-p",
+        help="Port (defaults to the first open port in the Storybook range)",
+    ),
     directory: str = typer.Option(".", "--dir", "-d", help="Project directory"),
-    host: str = typer.Option("localhost", "--host", help="Server host"),
 ):
-    """Start dev server to preview components.
+    """Launch Storybook to preview components.
 
-    Reads poliglot.preview.js config from your project root and serves
-    a preview app where you can browse and inspect component variants.
+    Starts the project's local Storybook so you can browse and inspect
+    component variants. The project must have Storybook installed and a
+    ``.storybook`` config; the underlying command resolves the project's
+    local storybook. When ``--port`` is omitted, an open port in the
+    Storybook range is selected automatically.
 
     Example:
         plgt ui preview
-        plgt ui preview --port 4000
+        plgt ui preview --port 6010
     """
     import subprocess  # noqa: PLC0415 — local import keeps top-of-file lighter
 
@@ -36,18 +43,16 @@ def preview(
         "preview",
         "-d",
         directory,
-        "-p",
-        str(port),
-        "--host",
-        host,
     ]
+    if port is not None:
+        cmd += ["-p", str(port)]
 
-    logger.info(f"Starting preview server on {host}:{port}...")
+    logger.info("Launching Storybook to preview components...")
 
     try:
         subprocess.run(cmd, check=True)  # noqa: S603 - command from trusted settings
     except subprocess.CalledProcessError as e:
-        logger.error(f"Preview server failed with exit code {e.returncode}")  # noqa: TRY400
+        logger.error(f"Storybook preview failed with exit code {e.returncode}")  # noqa: TRY400
         raise typer.Exit(1) from None
     except FileNotFoundError:
         logger.error(
