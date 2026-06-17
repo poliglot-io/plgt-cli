@@ -346,7 +346,7 @@ class TestListPackages:
             "items": [
                 {
                     "name": "claude",
-                    "publisherSlug": "alice",
+                    "publisher": {"slug": "alice"},
                     "latestVersion": "1.4.0",
                     "versionCount": 3,
                     "yankedVersionCount": 0,
@@ -355,7 +355,7 @@ class TestListPackages:
                 },
                 {
                     "name": "openai",
-                    "publisherSlug": "alice",
+                    "publisher": {"slug": "alice"},
                     "latestVersion": "0.9.0",
                     "versionCount": 2,
                     "yankedVersionCount": 1,
@@ -406,7 +406,7 @@ class TestListPackages:
             "items": [
                 {
                     "name": "demo",
-                    "publisherSlug": "alice",
+                    "publisher": {"slug": "alice"},
                     "versionCount": 1,
                 }
             ],
@@ -446,7 +446,7 @@ class TestListPackages:
             "items": [
                 {
                     "name": "demo",
-                    "publisherSlug": "alice",
+                    "publisher": {"slug": "alice"},
                     "latestVersion": "1.0.0",
                     "versionCount": 1,
                     "yankedVersionCount": 0,
@@ -476,7 +476,7 @@ class TestListPackages:
             "items": [
                 {
                     "name": "demo",
-                    "publisherSlug": "alice",
+                    "publisher": {"slug": "alice"},
                     "latestVersion": "1.0.0",
                     "versionCount": 1,
                     "yankedVersionCount": 0,
@@ -507,7 +507,7 @@ class TestListPackages:
             "items": [
                 {
                     "name": "demo",
-                    "publisherSlug": "alice",
+                    "publisher": {"slug": "alice"},
                     "latestVersion": "1.0.0",
                     "versionCount": 1,
                     "yankedVersionCount": 0,

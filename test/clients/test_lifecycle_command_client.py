@@ -233,7 +233,7 @@ class TestLifecycleCommandClientListCommands:
             "data": [
                 {
                     "id": "dep-1",
-                    "packageInstallationId": "pkg-inst-1",
+                    "packageInstallation": {"id": "pkg-inst-1"},
                     "packageName": "test-package",
                     "version": "1.0.0",
                     "status": "COMPLETED",
@@ -242,7 +242,7 @@ class TestLifecycleCommandClientListCommands:
                 },
                 {
                     "id": "dep-2",
-                    "packageInstallationId": "pkg-inst-1",
+                    "packageInstallation": {"id": "pkg-inst-1"},
                     "packageName": "test-package",
                     "version": "1.0.1",
                     "status": "PENDING",
@@ -307,7 +307,7 @@ class TestLifecycleCommandClientListCommands:
             "data": [
                 {
                     "id": "dep-fail",
-                    "packageInstallationId": "pkg-inst-1",
+                    "packageInstallation": {"id": "pkg-inst-1"},
                     "packageName": "test-package",
                     "version": "1.0.0",
                     "status": "FAILED",
@@ -337,7 +337,7 @@ class TestLifecycleCommandClientGetCommand:
         mock_response.json.return_value = {
             "data": {
                 "id": "dep-123",
-                "packageInstallationId": "pkg-inst-1",
+                "packageInstallation": {"id": "pkg-inst-1"},
                 "packageName": "test-package",
                 "version": "1.0.0",
                 "status": "COMPLETED",
@@ -376,14 +376,14 @@ class TestLifecycleCommandClientEvents:
             "data": [
                 {
                     "id": "evt-1",
-                    "commandId": "dep-123",
+                    "command": {"id": "dep-123"},
                     "level": "INFO",
                     "message": "Command started",
                     "createdAt": "2025-01-01T00:00:00.000",
                 },
                 {
                     "id": "evt-2",
-                    "commandId": "dep-123",
+                    "command": {"id": "dep-123"},
                     "level": "SUCCESS",
                     "message": "Validation completed",
                     "createdAt": "2025-01-01T00:01:00.000",

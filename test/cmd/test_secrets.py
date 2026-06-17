@@ -19,21 +19,21 @@ def create_test_secret(
     uri: str = "https://example.com/mymatrix#OpenAIAPIKey",
     description: str = "API key for OpenAI integration",
     *,
-    has_value: bool = True,
-    access_count: int = 5,
+    allowed_scopes: list[str] | None = None,
+    matrix_name: str | None = "mymatrix",
 ) -> Secret:
     """Create a test Secret object."""
     return Secret(
         id=identifier,
         uri=uri,
         description=description,
-        has_value=has_value,
         created_at=datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 1, 1, 14, 0, 0, tzinfo=UTC),
-        last_accessed_at=datetime(2025, 1, 1, 13, 0, 0, tzinfo=UTC)
-        if has_value
-        else None,
-        access_count=access_count,
+        allowed_scopes=allowed_scopes
+        if allowed_scopes is not None
+        else ["workspace", "principal"],
+        matrix_uri="https://example.com/mymatrix#",
+        matrix_name=matrix_name,
     )
 
 
@@ -52,12 +52,12 @@ class TestList:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
         mock_client.list_secrets.return_value = [
-            create_test_secret(has_value=True),
+            create_test_secret(allowed_scopes=["workspace", "principal"]),
             create_test_secret(
                 identifier="mymatrix:DatabasePassword",
                 uri="https://example.com/mymatrix#DatabasePassword",
                 description="Database password",
-                has_value=False,
+                allowed_scopes=["workspace"],
             ),
         ]
 
@@ -66,9 +66,9 @@ class TestList:
         assert result.exit_code == 0
         assert "mymatrix:OpenAIAPIKey" in result.output
         assert "mymatrix:DatabasePassword" in result.output
-        # Check for status indicators
-        assert "Yes" in result.output
-        assert "No" in result.output
+        # Matrix name and allowed-scope columns are rendered.
+        assert "mymatrix" in result.output
+        assert "principal" in result.output
 
     @patch("plgt.cmd.secrets.config")
     @patch("plgt.cmd.secrets.SecretsClient")
@@ -174,8 +174,8 @@ class TestGet:
         assert result.exit_code == 0
         assert "mymatrix:OpenAIAPIKey" in result.output
         assert "API key for OpenAI integration" in result.output
-        assert "Has Value:" in result.output
-        assert "Access Count:" in result.output
+        assert "Allowed Scopes:" in result.output
+        assert "workspace" in result.output
 
     @patch("plgt.cmd.secrets.config")
     @patch("plgt.cmd.secrets.SecretsClient")

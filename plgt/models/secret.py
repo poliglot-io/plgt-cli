@@ -4,7 +4,7 @@ This module contains types for the secret management feature,
 including the Secret dataclass for representing secret metadata.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
@@ -19,8 +19,12 @@ class Secret:
     id: str
     uri: str
     description: str
-    has_value: bool
     created_at: datetime
     updated_at: datetime
-    last_accessed_at: datetime | None
-    access_count: int
+    # Scopes at which a value may be set for this secret (e.g. workspace- or
+    # principal-scoped). Empty when the API reports none.
+    allowed_scopes: list[str] = field(default_factory=list)
+    # The matrix that declares this secret, carrying its uri and (when resolved)
+    # human-readable name. Either may be ``None`` when the API does not resolve it.
+    matrix_uri: str | None = None
+    matrix_name: str | None = None
