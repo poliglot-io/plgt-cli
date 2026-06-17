@@ -26,21 +26,25 @@ class TestListSecrets:
                     "id": "mymatrix:OpenAIAPIKey",
                     "uri": "https://example.com/mymatrix#OpenAIAPIKey",
                     "description": "API key for OpenAI integration",
-                    "hasValue": True,
+                    "allowedScopes": ["workspace", "principal"],
+                    "matrix": {
+                        "uri": "https://example.com/mymatrix#",
+                        "name": "mymatrix",
+                    },
                     "createdAt": "2025-01-01T00:00:00Z",
                     "updatedAt": "2025-01-01T12:00:00Z",
-                    "lastAccessedAt": "2025-01-01T10:00:00Z",
-                    "accessCount": 5,
                 },
                 {
                     "id": "mymatrix:DatabasePassword",
                     "uri": "https://example.com/mymatrix#DatabasePassword",
                     "description": "Database connection password",
-                    "hasValue": False,
+                    "allowedScopes": ["workspace"],
+                    "matrix": {
+                        "uri": "https://example.com/mymatrix#",
+                        "name": "mymatrix",
+                    },
                     "createdAt": "2025-01-02T00:00:00Z",
                     "updatedAt": "2025-01-02T00:00:00Z",
-                    "lastAccessedAt": None,
-                    "accessCount": 0,
                 },
             ]
         }
@@ -52,10 +56,10 @@ class TestListSecrets:
         assert len(result) == 2
         assert all(isinstance(s, Secret) for s in result)
         assert result[0].id == "mymatrix:OpenAIAPIKey"
-        assert result[0].has_value is True
-        assert result[0].access_count == 5
+        assert result[0].allowed_scopes == ["workspace", "principal"]
+        assert result[0].matrix_name == "mymatrix"
         assert result[1].id == "mymatrix:DatabasePassword"
-        assert result[1].has_value is False
+        assert result[1].allowed_scopes == ["workspace"]
 
     def test_list_with_prefix_passes_param(self):
         """Test list passes prefix parameter to API."""
@@ -107,11 +111,13 @@ class TestGetSecret:
                 "id": "mymatrix:OpenAIAPIKey",
                 "uri": "https://example.com/mymatrix#OpenAIAPIKey",
                 "description": "API key for OpenAI integration",
-                "hasValue": True,
+                "allowedScopes": ["workspace", "principal"],
+                "matrix": {
+                    "uri": "https://example.com/mymatrix#",
+                    "name": "mymatrix",
+                },
                 "createdAt": "2025-01-01T00:00:00Z",
                 "updatedAt": "2025-01-01T12:00:00Z",
-                "lastAccessedAt": "2025-01-01T10:00:00Z",
-                "accessCount": 5,
             }
         }
         mock_session.get.return_value = mock_response
@@ -121,7 +127,8 @@ class TestGetSecret:
 
         assert result.id == "mymatrix:OpenAIAPIKey"
         assert result.description == "API key for OpenAI integration"
-        assert result.has_value is True
+        assert result.allowed_scopes == ["workspace", "principal"]
+        assert result.matrix_name == "mymatrix"
         mock_session.get.assert_called_once()
         call_args = mock_session.get.call_args
         assert "/api/v1/secrets/test-workspace/mymatrix:OpenAIAPIKey" in call_args[0][0]
@@ -354,11 +361,13 @@ class TestSecretParsing:
             "id": "mymatrix:OpenAIAPIKey",
             "uri": "https://example.com/mymatrix#OpenAIAPIKey",
             "description": "API key for OpenAI",
-            "hasValue": True,
+            "allowedScopes": ["workspace", "principal"],
+            "matrix": {
+                "uri": "https://example.com/mymatrix#",
+                "name": "mymatrix",
+            },
             "createdAt": "2025-01-01T00:00:00Z",
             "updatedAt": "2025-01-01T12:00:00Z",
-            "lastAccessedAt": "2025-01-01T10:00:00Z",
-            "accessCount": 5,
         }
 
         secret = client._parse_secret(data)
@@ -366,30 +375,9 @@ class TestSecretParsing:
         assert secret.id == "mymatrix:OpenAIAPIKey"
         assert secret.uri == "https://example.com/mymatrix#OpenAIAPIKey"
         assert secret.description == "API key for OpenAI"
-        assert secret.has_value is True
-        assert secret.access_count == 5
-        assert secret.last_accessed_at is not None
-
-    def test_parse_secret_null_last_accessed(self):
-        """Test parsing secret with null lastAccessedAt."""
-        mock_session = Mock()
-        client = SecretsClient(mock_session)
-
-        data = {
-            "id": "mymatrix:NewSecret",
-            "uri": "https://example.com/mymatrix#NewSecret",
-            "description": "",
-            "hasValue": False,
-            "createdAt": "2025-01-01T00:00:00Z",
-            "updatedAt": "2025-01-01T00:00:00Z",
-            "lastAccessedAt": None,
-            "accessCount": 0,
-        }
-
-        secret = client._parse_secret(data)
-
-        assert secret.last_accessed_at is None
-        assert secret.access_count == 0
+        assert secret.allowed_scopes == ["workspace", "principal"]
+        assert secret.matrix_uri == "https://example.com/mymatrix#"
+        assert secret.matrix_name == "mymatrix"
 
     def test_parse_secret_missing_optional_fields(self):
         """Test parsing secret with missing optional fields uses defaults."""
@@ -406,6 +394,6 @@ class TestSecretParsing:
         secret = client._parse_secret(data)
 
         assert secret.description == ""
-        assert secret.has_value is False
-        assert secret.access_count == 0
-        assert secret.last_accessed_at is None
+        assert secret.allowed_scopes == []
+        assert secret.matrix_uri is None
+        assert secret.matrix_name is None

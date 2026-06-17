@@ -91,24 +91,18 @@ def list_secrets(
         table = Table(title=f"Secrets in '{target_workspace}'", show_lines=True)
         table.add_column("URI", style="dim", no_wrap=True)
         table.add_column("Matrix")
-        table.add_column("Has Value")
+        table.add_column("Scopes")
         table.add_column("Last Updated")
 
         for secret in secrets:
-            has_value = (
-                "[green]Yes[/green]" if secret.has_value else "[yellow]No[/yellow]"
-            )
-            updated = (
-                secret.updated_at.strftime("%Y-%m-%d %H:%M")
-                if secret.has_value
-                else "-"
-            )
-            matrix_name = _extract_matrix_name(secret.uri)
+            scopes = ", ".join(secret.allowed_scopes) if secret.allowed_scopes else "-"
+            updated = secret.updated_at.strftime("%Y-%m-%d %H:%M")
+            matrix_name = secret.matrix_name or _extract_matrix_name(secret.uri)
 
             table.add_row(
                 secret.id,
                 matrix_name,
-                has_value,
+                scopes,
                 updated,
             )
 
@@ -176,24 +170,20 @@ def get(
                 console.print(f"[red]Secret '{secret_uri}' not found.[/red]")
                 raise typer.Exit(1) from None
 
-            matrix_name = _extract_matrix_name(secret.uri)
-            has_value = "Yes" if secret.has_value else "No"
-            last_access = (
-                secret.last_accessed_at.strftime("%Y-%m-%dT%H:%M:%SZ")
-                if secret.last_accessed_at
-                else "-"
-            )
+            matrix_name = secret.matrix_name or _extract_matrix_name(secret.uri)
+            scopes = ", ".join(secret.allowed_scopes) if secret.allowed_scopes else "-"
 
             console.print(f"[bold]Secret: {secret.id}[/bold]")
-            console.print(f"  URI:          {secret.uri}")
-            console.print(f"  Matrix:       {matrix_name}")
-            console.print(f"  Description:  {secret.description or '-'}")
-            console.print(f"  Has Value:    {has_value}")
+            console.print(f"  URI:            {secret.uri}")
+            console.print(f"  Matrix:         {matrix_name}")
+            console.print(f"  Description:    {secret.description or '-'}")
+            console.print(f"  Allowed Scopes: {scopes}")
             console.print(
-                f"  Created:      {secret.created_at.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+                f"  Created:        {secret.created_at.strftime('%Y-%m-%dT%H:%M:%SZ')}"
             )
-            console.print(f"  Last Access:  {last_access}")
-            console.print(f"  Access Count: {secret.access_count}")
+            console.print(
+                f"  Updated:        {secret.updated_at.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+            )
 
     except ServiceError as e:
         console.print(f"[red]Failed to get secret: {e}[/red]")

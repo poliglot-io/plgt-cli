@@ -232,7 +232,7 @@ class RegistryClient:
                 if v.get("version")
             ]
             return NamespaceResolution(
-                publisher_slug=data["publisherSlug"],
+                publisher_slug=(data.get("publisher") or {})["slug"],
                 name=data["name"],
                 versions=versions,
             )

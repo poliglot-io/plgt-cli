@@ -22,10 +22,10 @@ class Extension:
 
     id: str
     label: str
-    target_matrix_uri: str
+    target_matrix_uri: str | None
     active: bool
-    owner_id: str
-    owner_username: str
+    owner_id: str | None
+    owner_username: str | None
     content: str | None
     created_at: datetime
     updated_at: datetime
@@ -287,13 +287,15 @@ class ExtensionClient:
         Returns:
             Extension object
         """
+        target_matrix = data.get("targetMatrix") or {}
+        owner = data.get("owner") or {}
         return Extension(
             id=data["id"],
             label=data["label"],
-            target_matrix_uri=data["targetMatrixUri"],
+            target_matrix_uri=target_matrix.get("uri"),
             active=data.get("active", False),
-            owner_id=data["ownerId"],
-            owner_username=data["ownerUsername"],
+            owner_id=owner.get("id"),
+            owner_username=owner.get("username"),
             content=data.get("content"),
             created_at=self._parse_datetime(data["createdAt"]),
             updated_at=self._parse_datetime(data["updatedAt"]),

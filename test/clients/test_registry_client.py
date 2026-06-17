@@ -236,7 +236,11 @@ class TestResolveNamespaceUri:
         response = Mock()
         response.json.return_value = {
             "data": {
-                "publisherSlug": "widget",
+                "uri": "urn:poliglot:registry:repository:widget/widget",
+                "publisher": {
+                    "uri": "urn:poliglot:registry:publisher:widget",
+                    "slug": "widget",
+                },
                 "name": "widget",
                 "versions": [
                     {"version": "1.2.0", "engineVersion": ">=1 <2"},

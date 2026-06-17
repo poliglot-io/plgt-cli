@@ -227,7 +227,7 @@ class TestYankUnyank:
                 "items": [
                     {
                         "name": "demo",
-                        "publisherSlug": "alice",
+                        "publisher": {"slug": "alice"},
                         "latestVersion": "1.0.0",
                         "versionCount": 2,
                         "yankedVersionCount": 1,

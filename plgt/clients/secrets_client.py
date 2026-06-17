@@ -266,17 +266,16 @@ class SecretsClient:
         Returns:
             Secret object.
         """
+        matrix = data.get("matrix") or {}
         return Secret(
             id=data["id"],
             uri=data["uri"],
             description=data.get("description", ""),
-            has_value=data.get("hasValue", False),
             created_at=self._parse_datetime(data["createdAt"]),
             updated_at=self._parse_datetime(data["updatedAt"]),
-            last_accessed_at=self._parse_datetime(data["lastAccessedAt"])
-            if data.get("lastAccessedAt")
-            else None,
-            access_count=data.get("accessCount", 0),
+            allowed_scopes=data.get("allowedScopes") or [],
+            matrix_uri=matrix.get("uri"),
+            matrix_name=matrix.get("name"),
         )
 
     def _parse_datetime(self, value: str) -> datetime:

@@ -456,19 +456,23 @@ class LifecycleCommandClient:
         Returns:
             LifecycleCommand object
         """
-        # packageInstallationId is null on PENDING / FAILED-pre-commit commands (the FK is set
-        # only after LM successfully creates the PackageInstallation row). Use .get() so a
-        # null/absent field doesn't KeyError-crash the parser the moment a fresh command shows up.
+        # packageInstallation is absent on PENDING / FAILED-pre-commit commands (the reference is
+        # set only once the installation exists), and parentCommand is absent on the root of a
+        # chain. Both arrive as nested objects carrying their uri/id; default to {} so a
+        # null/absent reference doesn't KeyError-crash the parser the moment a fresh command shows
+        # up.
+        package_installation = data.get("packageInstallation") or {}
+        parent_command = data.get("parentCommand") or {}
         return LifecycleCommand(
             id=data["id"],
-            package_installation_id=data.get("packageInstallationId"),
+            package_installation_id=package_installation.get("id"),
             package_name=data["packageName"],
             version=data["version"],
             status=LifecycleCommandStatus(data["status"]),
             error_message=data.get("errorMessage"),
             created_at=self._parse_datetime(data["createdAt"]),
             updated_at=self._parse_datetime(data["updatedAt"]),
-            parent_command_id=data.get("parentCommandId"),
+            parent_command_id=parent_command.get("id"),
             force=bool(data.get("force", False)),
         )
 
@@ -483,7 +487,7 @@ class LifecycleCommandClient:
         """
         return LifecycleEvent(
             id=data["id"],
-            command_id=data["commandId"],
+            command_id=(data.get("command") or {}).get("id"),
             level=LifecycleEventLevel(data["level"]),
             message=data["message"],
             created_at=self._parse_datetime(data["createdAt"]),
