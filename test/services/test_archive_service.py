@@ -1,5 +1,7 @@
 """Unit tests for archive service."""
 
+import os
+import struct
 import tarfile
 from pathlib import Path
 
@@ -188,3 +190,74 @@ class TestCreatePackageArchive:
         with tarfile.open(output_path, "r:gz") as tar:
             names = tar.getnames()
             assert "LICENSE.md" in names
+
+
+def _gzip_header_mtime(path: Path) -> int:
+    """Read the MTIME field (bytes 4..8, little-endian) from a gzip header."""
+    header = path.read_bytes()[:10]
+    assert header[:2] == b"\x1f\x8b", "not a gzip stream"
+    return struct.unpack("<I", header[4:8])[0]
+
+
+class TestReproducibility:
+    """The archives must be byte-identical for identical content, so a content
+    hash of the tarball is stable across machines and rebuilds."""
+
+    def test_bundle_is_byte_identical_across_rebuilds(self, tmp_path: Path):
+        assembly = "@prefix t: <http://t#> .\nt:a t:b t:c .\n"
+        artifacts = tmp_path / "artifacts"
+        artifacts.mkdir()
+        (artifacts / "components.js").write_text("module.exports={};")
+        (artifacts / "queries").mkdir()
+        (artifacts / "queries" / "get.graphql").write_text("query{ id }")
+
+        first = tmp_path / "first.tar.gz"
+        second = tmp_path / "second.tar.gz"
+
+        create_tar_gz_bundle(assembly, artifacts, first)
+        # Touch the source files to a different mtime — a reproducible build must
+        # NOT pick up on-disk timestamps.
+        for f in artifacts.rglob("*"):
+            os.utime(f, (1_000_000, 1_000_000))
+        create_tar_gz_bundle(assembly, artifacts, second)
+
+        assert first.read_bytes() == second.read_bytes()
+
+    def test_bundle_gzip_header_has_no_timestamp(self, tmp_path: Path):
+        out = tmp_path / "b.tar.gz"
+        create_tar_gz_bundle("@prefix t: <http://t#> .", None, out)
+        assert _gzip_header_mtime(out) == 0
+
+    def test_bundle_members_are_sorted(self, tmp_path: Path):
+        artifacts = tmp_path / "artifacts"
+        artifacts.mkdir()
+        for name in ["zebra.txt", "alpha.txt", "mango.txt"]:
+            (artifacts / name).write_text(name)
+        out = tmp_path / "b.tar.gz"
+
+        create_tar_gz_bundle("@prefix t: <http://t#> .", artifacts, out)
+
+        with tarfile.open(out, "r:gz") as tar:
+            names = tar.getnames()
+        assert names == sorted(names)
+
+    def test_package_archive_is_byte_identical_across_rebuilds(self, tmp_path: Path):
+        project_dir = tmp_path / "pkg"
+        project_dir.mkdir()
+        (project_dir / "README.md").write_text("# demo\n")
+        (project_dir / "LICENSE").write_text("Apache-2.0\n")
+        config = PackageConfig(
+            name="demo",
+            version="1.0.0",
+            engine_version=">=1 <2",
+            project_dir=project_dir,
+        )
+
+        first = tmp_path / "first.tgz"
+        second = tmp_path / "second.tgz"
+        create_package_archive(config, [], first)
+        os.utime(project_dir / "README.md", (1_000_000, 1_000_000))
+        create_package_archive(config, [], second)
+
+        assert first.read_bytes() == second.read_bytes()
+        assert _gzip_header_mtime(first) == 0
