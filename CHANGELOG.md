@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0b12] — beta
+
 ### Added
 
 - `plgt secret set` now writes secret values at a chosen **scope**. A new
