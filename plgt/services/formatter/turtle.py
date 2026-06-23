@@ -449,6 +449,13 @@ def _emit_predicate_object_group(
         if predicate_iri in EXPAND_TO_FULL_IRI_PREDICATES:
             objects = [_expand_pname_object(obj, prefix_table) for obj in objects]
 
+    # Defensive: a well-formed predicate-object group always has at least
+    # one object. An empty list can only arise from a malformed grouping
+    # (e.g. a stray comment token treated as a predicate); emit just the
+    # predicate text rather than indexing ``objects[0]`` and crashing.
+    if not objects:
+        return
+
     # Single object: render inline (handles blank-node objects too —
     # _render_complex_object_inline knows how to multi-line a [ ... ]).
     if len(objects) == 1:
@@ -625,15 +632,28 @@ def _emit_predicate_list_from_tokens(
     """Like _emit_predicate_list, but operates on a pre-sliced token list
     (the body of a blank-node group). Caller has positioned the cursor at
     the start of a new line. Emits each predicate-object group on its own
-    line with `;`-separation; no trailing dot."""
-    groups: list[list[Token]] = []
+    line with `;`-separation; no trailing dot.
+
+    Comments at depth 0 are pulled out as standalone segments (exactly as
+    the top-level ``_emit_predicate_list`` does), so a comment sitting
+    inside a nested blank-node predicate list is emitted on its own line
+    rather than being folded into a predicate-object group — which would
+    otherwise leave that group with an empty object list and either glue
+    the following predicate onto the comment line or crash the emitter."""
+    segments: list[Token | list[Token]] = []
     current: list[Token] = []
     depth = 0
     for tok in tokens:
         if tok.type == TT.SEMI and depth == 0:
             if current:
-                groups.append(current)
+                segments.append(current)
                 current = []
+            continue
+        if tok.type == TT.COMMENT and depth == 0:
+            if current:
+                segments.append(current)
+                current = []
+            segments.append(tok)
             continue
         if tok.type in (TT.LBRACK, TT.LPAREN):
             depth += 1
@@ -641,19 +661,37 @@ def _emit_predicate_list_from_tokens(
             depth -= 1
         current.append(tok)
     if current:
-        groups.append(current)
+        segments.append(current)
 
-    def is_type_group(g: list[Token]) -> bool:
-        return bool(g) and g[0].type == TT.PNAME and g[0].text == "a"
+    def is_type_group(seg: Token | list[Token]) -> bool:
+        return (
+            isinstance(seg, list)
+            and bool(seg)
+            and seg[0].type == TT.PNAME
+            and seg[0].text == "a"
+        )
 
-    ordered = [g for g in groups if is_type_group(g)] + [
-        g for g in groups if not is_type_group(g)
-    ]
-    for idx, group in enumerate(ordered):
-        _emit_predicate_object_group(group, out, indent=indent)
-        if idx < len(ordered) - 1:
-            out.write(" ;")
-            out.newline()
+    type_segs = [s for s in segments if is_type_group(s)]
+    other_segs = [s for s in segments if not is_type_group(s)]
+    ordered = type_segs + other_segs
+
+    # Track the last emitted segment kind so a predicate-object group gets a
+    # trailing ` ;` only when another group/comment follows, and standalone
+    # comment lines never receive one.
+    last_kind: str | None = None  # "group" | "comment" | None
+    for seg in ordered:
+        if isinstance(seg, Token):
+            if last_kind == "group":
+                out.write(" ;")
+                out.newline()
+            out.line(INDENT * indent + seg.text)
+            last_kind = "comment"
+        else:
+            if last_kind == "group":
+                out.write(" ;")
+                out.newline()
+            _emit_predicate_object_group(seg, out, indent=indent)
+            last_kind = "group"
     out.newline()
 
 
