@@ -722,3 +722,50 @@ class TestPackageMetadataInArchive:
                 "tags",
             ):
                 assert key not in manifest, f"unexpected key {key} in minimal manifest"
+
+
+class TestMatrixPathDefault:
+    """A matrix may omit `path` when it is spec-only (a named collection of spec
+    directories with no dedicated subdirectory). Omitted `path` resolves to the
+    package root, so the spec patterns resolve against the package itself."""
+
+    def _write(self, project_dir: Path, matrix_block: str) -> Path:
+        config_path = project_dir / "poliglot.yml"
+        config_path.write_text(
+            "package:\n"
+            "  name: demo\n"
+            "  version: 0.0.1\n"
+            '  engineVersion: ">=1 <2"\n'
+            "matrix:\n" + matrix_block
+        )
+        return config_path
+
+    def test_omitted_path_defaults_to_package_root(self):
+        from plgt.services.build_service import create_build_config
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_dir = Path(tmpdir)
+            config_path = self._write(
+                project_dir,
+                "  plgt:\n    spec:\n      - ./spec/plgt\n",
+            )
+
+            cfg = create_build_config(config_path)
+
+            assert len(cfg.matrices) == 1
+            # "." → the package root, NOT "./plgt" (which would be a missing dir).
+            assert cfg.matrices[0].path == Path(".")
+
+    def test_explicit_path_is_honored(self):
+        from plgt.services.build_service import create_build_config
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_dir = Path(tmpdir)
+            config_path = self._write(
+                project_dir,
+                "  issues:\n    path: ./issues\n    spec:\n      - ./spec\n",
+            )
+
+            cfg = create_build_config(config_path)
+
+            assert cfg.matrices[0].path == Path("issues")

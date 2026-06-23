@@ -288,8 +288,11 @@ def create_build_config(config_file: Path | None = None) -> PackageConfig:
     matrices: list[MatrixBuildConfig] = []
 
     for matrix_name, matrix_config in matrix_section.items():
-        # Get matrix path (relative to project root)
-        matrix_path_str = matrix_config.get("path", f"./{matrix_name}")
+        # Matrix root, relative to the package root. Defaults to the package root
+        # itself ("."), so a spec-only matrix — a named collection of spec
+        # directories with no dedicated subdirectory — can omit `path` entirely
+        # and still resolve its `spec`/`artifacts` patterns against the package.
+        matrix_path_str = matrix_config.get("path", ".")
         matrix_path = Path(normalize_path(matrix_path_str))
 
         # Get spec patterns

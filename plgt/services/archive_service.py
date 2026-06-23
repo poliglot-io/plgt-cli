@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 import tarfile
 from io import BytesIO
@@ -12,6 +13,56 @@ from plgt.services.rdf_operations import BuildError
 
 if TYPE_CHECKING:
     from plgt.models.build_types import MatrixBuildResult, PackageConfig
+
+
+def _deterministic_tarinfo(name: str, size: int) -> tarfile.TarInfo:
+    """Build a ``TarInfo`` whose metadata is fully fixed.
+
+    All environment-derived fields (mtime, uid/gid, owner names, mode) are
+    zeroed/normalized so the same content always serializes to the same header
+    bytes regardless of when or where the build runs.
+    """
+    info = tarfile.TarInfo(name=name)
+    info.size = size
+    info.mtime = 0
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    info.mode = 0o644
+    info.type = tarfile.REGTYPE
+    return info
+
+
+def _write_reproducible_tar_gz(
+    output_path: Path, members: list[tuple[str, bytes]]
+) -> None:
+    """Write a reproducible ``.tar.gz``.
+
+    Members are emitted in sorted name order with fixed metadata, and the gzip
+    header carries neither a timestamp nor an original filename. Identical inputs
+    therefore always produce byte-identical archives, so a content hash of the
+    archive is stable across machines and rebuilds. Duplicate names keep their
+    first occurrence (matching the order in which callers append them).
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    seen: set[str] = set()
+    ordered: list[tuple[str, bytes]] = []
+    for name, data in members:
+        if name in seen:
+            continue
+        seen.add(name)
+        ordered.append((name, data))
+    ordered.sort(key=lambda member: member[0])
+
+    with output_path.open("wb") as raw:
+        # mtime=0 + empty filename keep the gzip header free of wall-clock data,
+        # which is otherwise the single largest source of build-to-build drift.
+        with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as gz:
+            with tarfile.open(fileobj=gz, mode="w") as tar:
+                for name, data in ordered:
+                    tar.addfile(_deterministic_tarinfo(name, len(data)), BytesIO(data))
 
 
 def create_tar_gz_bundle(
@@ -38,9 +89,6 @@ def create_tar_gz_bundle(
         BuildError: If bundle creation fails
     """
     try:
-        # Create parent directory if it doesn't exist
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
         # Normalize to list
         if artifacts_dirs is None:
             dirs_list: list[Path] = []
@@ -51,44 +99,31 @@ def create_tar_gz_bundle(
 
         migrations_list = list(migration_files or [])
 
-        # Create tar.gz bundle
-        with tarfile.open(output_path, "w:gz") as tar:
-            # Add assembly.ttl from string content
-            assembly_bytes = assembly_content.encode("utf-8")
-            assembly_info = tarfile.TarInfo(name="assembly.ttl")
-            assembly_info.size = len(assembly_bytes)
-            tar.addfile(assembly_info, BytesIO(assembly_bytes))
+        # Collect (arcname, content) members; the reproducible writer reads the
+        # file bytes itself (never `tar.add`) so no on-disk metadata leaks in.
+        members: list[tuple[str, bytes]] = [
+            ("assembly.ttl", assembly_content.encode("utf-8")),
+        ]
 
-            # Track added files to avoid duplicates
-            added_files: set[str] = set()
+        # Migration files into migrations/ — flat layout keyed by filename.
+        for migration_file in migrations_list:
+            if migration_file.is_file():
+                members.append(
+                    (f"migrations/{migration_file.name}", migration_file.read_bytes())
+                )
 
-            # Add migration files into migrations/ — flat layout keyed by filename.
-            for migration_file in migrations_list:
-                if not migration_file.is_file():
-                    continue
-                arcname = f"migrations/{migration_file.name}"
-                if arcname in added_files:
-                    continue
-                tar.add(migration_file, arcname=arcname)
-                added_files.add(arcname)
+        # Artifact directories into artifacts/. Sorted so the member order is
+        # independent of filesystem traversal order.
+        for artifacts_dir in dirs_list:
+            if artifacts_dir and artifacts_dir.exists() and artifacts_dir.is_dir():
+                for file_path in sorted(artifacts_dir.rglob("*")):
+                    if file_path.is_file():
+                        rel_path = file_path.relative_to(artifacts_dir).as_posix()
+                        members.append(
+                            (f"artifacts/{rel_path}", file_path.read_bytes())
+                        )
 
-            # Add all artifact directories
-            for artifacts_dir in dirs_list:
-                if artifacts_dir and artifacts_dir.exists() and artifacts_dir.is_dir():
-                    # Add files from this directory to artifacts/
-                    for file_path in artifacts_dir.rglob("*"):
-                        if file_path.is_file():
-                            # Get relative path within the artifacts dir
-                            rel_path = file_path.relative_to(artifacts_dir)
-                            arcname = f"artifacts/{rel_path}"
-
-                            # Skip if already added (from earlier directory)
-                            if arcname in added_files:
-                                continue
-
-                            tar.add(file_path, arcname=arcname)
-                            added_files.add(arcname)
-
+        _write_reproducible_tar_gz(output_path, members)
         return output_path
 
     except Exception as e:
@@ -121,23 +156,20 @@ def discover_artifacts_directory(spec_dir: Path) -> Path | None:
     return artifacts_dir
 
 
-def _add_root_file_if_present(
-    tar: tarfile.TarFile, project_dir: Path, candidates: list[str]
-) -> None:
-    """Add the first matching root-level file (e.g. README.md, LICENSE) to the tarball.
+def _first_present_root_file(
+    project_dir: Path, candidates: list[str]
+) -> tuple[str, bytes] | None:
+    """Return ``(name, bytes)`` for the first matching root-level file, or None.
 
-    Tries each candidate name in order against ``project_dir`` and adds the first one that
-    exists, preserving its canonical name. No-ops when none are present so the build still
-    succeeds for packages that ship without these files.
+    Tries each candidate name in order against ``project_dir`` and returns the
+    first that exists, preserving its canonical name. Returns None when none are
+    present so the build still succeeds for packages that ship without them.
     """
     for name in candidates:
         candidate = project_dir / name
         if candidate.is_file():
-            data = candidate.read_bytes()
-            info = tarfile.TarInfo(name=name)
-            info.size = len(data)
-            tar.addfile(info, BytesIO(data))
-            return
+            return (name, candidate.read_bytes())
+    return None
 
 
 def create_package_archive(
@@ -169,9 +201,6 @@ def create_package_archive(
         BuildError: If package creation fails
     """
     try:
-        # Create parent directory if it doesn't exist
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
         # Build manifest
         manifest: dict = {
             "name": package_config.name,
@@ -220,63 +249,49 @@ def create_package_archive(
                 for dep in package_config.dependencies
             ]
 
-        with tarfile.open(output_path, "w:gz") as tar:
-            # Add manifest.json
-            manifest_bytes = json.dumps(manifest, indent=2).encode("utf-8")
-            manifest_info = tarfile.TarInfo(name="manifest.json")
-            manifest_info.size = len(manifest_bytes)
-            tar.addfile(manifest_info, BytesIO(manifest_bytes))
+        members: list[tuple[str, bytes]] = [
+            ("manifest.json", json.dumps(manifest, indent=2).encode("utf-8")),
+        ]
 
-            # Bundle README + LICENSE from the package source dir into the
-            # tarball root. README at the tarball root is stored on the
-            # version row for the registry detail page. LICENSE rides along for
-            # compliance (Apache-2.0 §4(a) requires distributing a copy of
-            # the License with any distribution); we don't render it in the
-            # UI today, but the SPDX shorthand in manifest.json is the
-            # display surface, and the bundled file ensures `plgt install`
-            # produces a complete package on disk.
-            _add_root_file_if_present(
-                tar, package_config.project_dir, ["README.md", "readme.md"]
-            )
-            _add_root_file_if_present(
-                tar,
-                package_config.project_dir,
-                ["LICENSE", "LICENSE.md", "LICENSE.txt", "license"],
-            )
+        # Bundle README + LICENSE from the package source dir into the tarball
+        # root. README at the tarball root is stored on the version row for the
+        # registry detail page. LICENSE rides along for compliance (Apache-2.0
+        # §4(a) requires distributing a copy of the License with any
+        # distribution); we don't render it in the UI today, but the SPDX
+        # shorthand in manifest.json is the display surface, and the bundled file
+        # ensures `plgt install` produces a complete package on disk.
+        readme = _first_present_root_file(
+            package_config.project_dir, ["README.md", "readme.md"]
+        )
+        if readme:
+            members.append(readme)
+        license_file = _first_present_root_file(
+            package_config.project_dir,
+            ["LICENSE", "LICENSE.md", "LICENSE.txt", "license"],
+        )
+        if license_file:
+            members.append(license_file)
 
-            # Add each matrix's contents
-            for result in matrix_results:
-                matrix_output_dir = result.output_dir
+        # Add each matrix's contents, re-keyed under the matrix name.
+        for result in matrix_results:
+            assembly_path = result.output_dir / "matrix.tar.gz"
+            if not assembly_path.exists():
+                continue
+            with tarfile.open(assembly_path, "r:gz") as matrix_tar:
+                for member in matrix_tar.getmembers():
+                    if member.name == "assembly.ttl":
+                        f = matrix_tar.extractfile(member)
+                        if f:
+                            members.append((f"{result.name}/assembly.ttl", f.read()))
+                    elif member.isfile() and (
+                        member.name.startswith("artifacts/")
+                        or member.name.startswith("migrations/")
+                    ):
+                        f = matrix_tar.extractfile(member)
+                        if f:
+                            members.append((f"{result.name}/{member.name}", f.read()))
 
-                # Add assembly.ttl from the matrix bundle
-                assembly_path = matrix_output_dir / "matrix.tar.gz"
-                if assembly_path.exists():
-                    # Extract assembly.ttl from the matrix bundle and add it
-                    with tarfile.open(assembly_path, "r:gz") as matrix_tar:
-                        for member in matrix_tar.getmembers():
-                            if member.name == "assembly.ttl":
-                                # Read the file content
-                                f = matrix_tar.extractfile(member)
-                                if f:
-                                    content = f.read()
-                                    new_info = tarfile.TarInfo(
-                                        name=f"{result.name}/assembly.ttl"
-                                    )
-                                    new_info.size = len(content)
-                                    tar.addfile(new_info, BytesIO(content))
-                            elif member.name.startswith(
-                                "artifacts/"
-                            ) or member.name.startswith("migrations/"):
-                                # Copy artifacts and migrations with matrix prefix
-                                f = matrix_tar.extractfile(member)
-                                if f and member.isfile():
-                                    content = f.read()
-                                    new_info = tarfile.TarInfo(
-                                        name=f"{result.name}/{member.name}"
-                                    )
-                                    new_info.size = len(content)
-                                    tar.addfile(new_info, BytesIO(content))
-
+        _write_reproducible_tar_gz(output_path, members)
         return output_path
 
     except Exception as e:
