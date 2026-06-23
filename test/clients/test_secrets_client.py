@@ -289,6 +289,26 @@ class TestSetSecretValue:
         assert "nonce" in payload
         assert "clientPublicKey" in payload
         assert payload["keyId"] == "test-key-id"
+        # Defaults to the workspace scope; no scopeEntityId for workspace writes.
+        assert payload["scope"] == "workspace"
+        assert "scopeEntityId" not in payload
+
+    def test_set_value_principal_scope_sends_entity_id(self):
+        """A principal-scoped write carries scope='principal' + scopeEntityId."""
+        mock_session = self._mock_pubkey_session()
+
+        client = SecretsClient(mock_session)
+        client.set_secret_value(
+            "test-workspace",
+            "mymatrix:OpenAIAPIKey",
+            "secret-value",
+            scope="principal",
+            scope_entity_id="11111111-2222-3333-4444-555555555555",
+        )
+
+        payload = mock_session.put.call_args[1]["json"]
+        assert payload["scope"] == "principal"
+        assert payload["scopeEntityId"] == "11111111-2222-3333-4444-555555555555"
 
     def test_set_value_pubkey_http_error(self):
         """Test set_secret_value raises ServiceError when pubkey POST fails."""
