@@ -18,6 +18,13 @@ jobs:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     environment: pypi-publish  # requires manual approval per environment policy
+    env:
+      # Frozen so no build step (uv sync / uv run / uv build) re-resolves and rewrites
+      # uv.lock. With dynamic = ["version"] (setuptools_scm), a non-frozen `uv run`
+      # recomputes the editable package's version into the lock, dirtying the tree —
+      # which makes setuptools_scm emit a dev version (e.g. 0.1.0b13.dev0) instead of the
+      # tag, failing the "Verify built version matches tag" check below.
+      UV_FROZEN: "1"
     steps:
       - uses: actions/checkout@v4
         with:
