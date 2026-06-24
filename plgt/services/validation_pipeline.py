@@ -93,9 +93,10 @@ PLGT_SCRT_MANAGED_SECRET = URIRef("https://poliglot.io/os/spec/secrets#ManagedSe
 PLGT_SCRT_DESCRIPTION = URIRef("https://poliglot.io/os/spec/secrets#description")
 
 # Custom SHACL target type that selects every IRI-identified (non-blank,
-# non-literal) node in the data graph as a focus node. pyshacl does not know
-# this target out of the box, so we expand it into an equivalent SHACL-AF
-# sh:SPARQLTarget before validation (see _expand_iri_node_targets).
+# non-literal) node in the data graph as a focus node. Standard SHACL engines
+# (pyshacl) do not know this target and raise a ShapeLoadError on it, so we
+# STRIP every NodeShape that carries it before handing the graph to pyshacl and
+# evaluate those shapes natively in Python (see _evaluate_iri_node_targets).
 PLGT_IRI_NODE_TARGET = URIRef("https://poliglot.io/os/spec#IRINodeTarget")
 
 SH_NS = rdflib.Namespace("http://www.w3.org/ns/shacl#")
@@ -281,12 +282,23 @@ def validate_project(
         project_dir, workspace, lockfile, local_graph, bag
     )
 
-    # Phase 6: SHACL validation against assembled graph.
+    # Phase 6: SHACL validation. Runs over the assembled graph (package + deps
+    # + system matrix) with RDFS inference ON, so the materialized type
+    # hierarchy matches what the runtime validates against — a shape that
+    # should fire because of an INFERRED type fires here too. The performance
+    # win comes from scoping the FOCUS to the package's OWN subjects (the
+    # subjects ``local_graph`` contributes) rather than the whole inferred
+    # closure: each shape still computes its natural targets over the full
+    # inferred data, but only own subjects are validated, so a quality shape
+    # targeting e.g. rdfs:Resource doesn't fan out across the imported closure.
+    # Imported subjects' own shapes were already checked when their package
+    # was published.
     if assembled is not None:
         _run_shacl_validation(
             assembled,
             project_dir,
             bag,
+            local_graph=local_graph,
             local_namespaces=matrix_namespaces,
             subject_origin=subject_origin,
         )
@@ -962,63 +974,119 @@ def _merge_cache_dir(
 # Phase 6: SHACL
 
 
+@dataclass(frozen=True)
+class _IRINodeConstraint:
+    """One ``sh:property`` constraint of a ``plgt:IRINodeTarget`` NodeShape,
+    extracted for native evaluation over every named IRI node.
+
+    These advisory shapes are minCount-only documentation nudges: for each
+    named IRI focus node we count its values for ``path``; when that count is
+    below ``min_count`` we emit a finding carrying ``severity`` and
+    ``message``, sourced at ``source_shape``. Every field is read from the
+    shapes graph — nothing is hardcoded.
+    """
+
+    path: URIRef
+    min_count: int
+    severity: URIRef | None
+    message: str | None
+    source_shape: str | None
+
+
 def _run_shacl_validation(
     graph: Graph,
     project_dir: Path,
     bag: DiagnosticBag,
     *,
+    local_graph: Graph | None = None,
     local_namespaces: set[str] | None = None,
     subject_origin: dict[URIRef, str] | None = None,
 ) -> None:
-    """Run pyshacl over the assembled graph. Shapes come from the same
-    graph — system matrix shapes plus local matrix shapes were merged in
-    phase 3. Diagnostics map to PLGT_E0500-band codes.
+    """Run SHACL validation with RDFS inference, scoped to the package's OWN
+    subjects.
 
-    pyshacl's report is itself an RDF graph; we walk it to extract
-    structured findings (focus node, source shape, result message) rather
-    than dumping the textual report.
+    ``graph`` is the assembled graph (package + deps + system matrix); it
+    carries every shape and the full class hierarchy. pyshacl validates over
+    this full graph with ``inference="rdfs"`` so the materialized type
+    hierarchy matches what the runtime sees — a shape that fires only because
+    of an INFERRED type fires here too (no build-vs-runtime drift). ``graph``
+    also stays the DATA graph so cross-matrix relationships (an own subject
+    referencing an imported, typed resource) resolve.
 
-    pyshacl is a hard dependency declared in pyproject.toml. Import failure
-    or a validator crash is a broken environment; we surface it as a real
-    diagnostic (PLGT_E0500) rather than swallowing it, so a clean
-    `plgt validate` cannot lie about whether shapes ran. The diagnostic-bag
-    entry keeps the JSON output shape well-formed even when SHACL blew up:
-    callers consuming `--json` see an error row instead of a stack trace.
+    ``local_graph`` is the package's own TTL (post script:// expansion). When
+    supplied it is used to compute the FOCUS node list — the package's own IRI
+    subjects — which is handed to pyshacl's ``focus_nodes`` option. pyshacl
+    computes each shape's natural targets over the full inferred data graph and
+    then INTERSECTS them with the focus list, so only own subjects are
+    validated. Imported subjects' own shapes were already checked when their
+    package published, so they are not re-evaluated. When ``local_graph`` is
+    ``None`` (legacy unit-test callers) the assembled graph is the data graph
+    and no focus restriction is applied, preserving old behaviour.
+
+    Two evaluation paths:
+
+    1. **Native IRI-node pass.** NodeShapes whose ``sh:target`` object is typed
+       ``plgt:IRINodeTarget`` are opaque to pyshacl (ShapeLoadError). We strip
+       them from the graph pyshacl sees and evaluate them in Python: for each
+       named IRI node we count values for each constraint's ``sh:path`` and emit
+       a finding (carrying ``sh:severity`` / ``sh:message``) when below
+       ``sh:minCount``.
+    2. **pyshacl** over the remaining (standard) shapes.
+
+    Diagnostics map to PLGT_E0500-band codes. pyshacl is a hard dependency;
+    import failure or a validator crash surfaces as a real PLGT_E0500 so a clean
+    `plgt validate` cannot lie about whether shapes ran.
     """
+    scoped = local_graph is not None
+    iri_node_data_graph = local_graph if scoped else graph
     try:
         import pyshacl
 
         # CLI-only authoring-guidance shapes (resource-annotation suggestions
         # etc.) are bundled with the CLI rather than published in the plgt
         # matrix: they're noise in platform-side validation but useful here.
-        # Merging them into the assembled graph adds a handful of triples; the
-        # extract-shapes-from-data_graph path below picks them up alongside the
-        # system matrix shapes.
         _merge_cli_quality_shapes(graph)
 
-        # The system matrix ships a shape whose sh:target is the custom
-        # plgt:IRINodeTarget target type (selects all IRI-identified nodes).
-        # pyshacl does not recognize this custom target and raises
-        # ShapeLoadError on load. Rewrite it to an equivalent SHACL-AF
-        # sh:SPARQLTarget so the shape loads and applies with the intended
-        # semantics. No-op when no such target is present.
-        _expand_iri_node_targets(graph)
+        # Carve out the plgt:IRINodeTarget NodeShapes BEFORE pyshacl sees the
+        # graph: the custom target is opaque to standard SHACL engines and
+        # raises ShapeLoadError. We extract their property constraints for the
+        # native pass and strip their subgraphs so pyshacl never loads them.
+        iri_node_constraints = _extract_and_strip_iri_node_shapes(graph)
 
-        # Shapes already live in the assembled graph (system matrix + local
-        # shapes were merged in phase 3, CLI-only shapes merged just above).
-        # Passing the same graph as data_graph AND shacl_graph AND ont_graph
-        # causes pyshacl to union the graph with itself and re-run inference
-        # on the doubled graph — pathologically slow on graphs with rich class
-        # hierarchies. Leave shacl_graph=None / ont_graph=None so pyshacl
-        # extracts shapes from data_graph directly with no doubling.
-        # RDFS inference is also unnecessary here because
-        # the system matrix already publishes the materialized hierarchy
-        # authors target.
+        # Native IRI-node pass: O(1) isURI test per node, no full-graph scan.
+        # Iterate only the package's own IRI subjects so dependency resources
+        # are never reported.
+        _evaluate_iri_node_targets(
+            iri_node_data_graph,
+            iri_node_constraints,
+            bag,
+            local_namespaces=local_namespaces,
+            subject_origin=subject_origin,
+        )
+
+        # pyshacl over the standard shapes, with RDFS inference materialized so
+        # the type hierarchy matches the runtime. The data graph is the full
+        # assembled graph (so inferred types and cross-matrix references
+        # resolve); the FOCUS is restricted to the package's own IRI subjects
+        # via ``focus_nodes``. pyshacl computes each shape's natural targets
+        # over the inferred data graph, then intersects with the focus list —
+        # so a quality shape that targets a broad class (e.g. rdfs:Resource)
+        # does NOT fan out across the imported closure (the cost #29 traded
+        # correctness to avoid), while a constraint on an own subject that
+        # references an imported, inferred-typed resource still runs.
+        #
+        # The legacy-caller path (no scoping graph) passes the data graph as
+        # its own shapes source and applies no focus restriction.
+        focus_nodes = (
+            _own_focus_nodes(local_graph, local_namespaces) if scoped else None
+        )
         conforms, report_graph, _ = pyshacl.validate(
             data_graph=graph,
+            shacl_graph=graph if scoped else None,
             inference="rdfs",
             advanced=True,
             inplace=False,
+            focus_nodes=focus_nodes,
         )
     except Exception as e:  # noqa: BLE001 — pyshacl + its rdflib internals raise many shapes
         bag.error(
@@ -1031,17 +1099,6 @@ def _run_shacl_validation(
         return
 
     sh = rdflib.Namespace("http://www.w3.org/ns/shacl#")
-    # SHACL severity → our severity + code-band. The default severity in
-    # SHACL is sh:Violation (we treat as error). sh:Warning and sh:Info are
-    # the recommendation/hint tiers used by the CLI's bundled
-    # ResourceAnnotationShape (see services/shapes/quality.ttl) and any
-    # other guidance shapes a project ships locally.
-    severity_routing = {
-        str(sh.Violation): ("PLGT_E0500", bag.error),
-        str(sh.Warning): ("PLGT_W0500", bag.warning),
-        str(sh.Info): ("PLGT_I0500", bag.info),
-    }
-
     for result in report_graph.subjects(predicate=RDF_TYPE, object=sh.ValidationResult):
         focus_node = next(report_graph.objects(result, sh.focusNode), None)
         result_message = next(report_graph.objects(result, sh.resultMessage), None)
@@ -1073,25 +1130,51 @@ def _run_shacl_validation(
             parts.append(f"(shape <{source_shape}>)")
         message = " — ".join(parts) if parts else "SHACL violation"
 
-        code, emit = severity_routing.get(
-            str(result_sev) if result_sev else "", ("PLGT_E0500", bag.error)
-        )
-        label = {
-            "PLGT_E0500": "SHACL violation",
-            "PLGT_W0500": "SHACL warning",
-            "PLGT_I0500": "SHACL suggestion",
-        }[code]
         focus_subject = str(focus_node) if isinstance(focus_node, URIRef) else None
-        # Pin the diagnostic to the TTL that declared the focus node so the
-        # grouped renderer can nest it under the right file. Without this,
-        # every SHACL finding falls into the graph-level bucket — the
-        # validation graph itself has no native triple-origin metadata.
         focus_path = (
             subject_origin.get(focus_node)
             if subject_origin and isinstance(focus_node, URIRef)
             else None
         )
-        emit(code, f"{label}: {message}", subject=focus_subject, path=focus_path)
+        _emit_shacl_finding(
+            bag,
+            str(result_sev) if result_sev else "",
+            message,
+            focus_subject,
+            focus_path,
+        )
+
+
+# SHACL severity → our severity + code-band. The default severity in SHACL is
+# sh:Violation (we treat as error). sh:Warning and sh:Info are the
+# recommendation/hint tiers used by the IRI-node advisory shapes and the CLI's
+# bundled ResourceAnnotationShape (see services/shapes/quality.ttl).
+_SEVERITY_CODES = {
+    str(SH_NS.Violation): ("PLGT_E0500", "SHACL violation"),
+    str(SH_NS.Warning): ("PLGT_W0500", "SHACL warning"),
+    str(SH_NS.Info): ("PLGT_I0500", "SHACL suggestion"),
+}
+
+
+def _emit_shacl_finding(
+    bag: DiagnosticBag,
+    severity_uri: str,
+    message: str,
+    subject: str | None,
+    path: str | None,
+) -> None:
+    """Route a SHACL finding to the diagnostic bag by its ``sh:resultSeverity``.
+
+    Unknown / absent severity defaults to ``sh:Violation`` (an error) so a
+    misconfigured shape can never silently downgrade a finding.
+    """
+    code, label = _SEVERITY_CODES.get(severity_uri, ("PLGT_E0500", "SHACL violation"))
+    emit = {
+        "PLGT_E0500": bag.error,
+        "PLGT_W0500": bag.warning,
+        "PLGT_I0500": bag.info,
+    }[code]
+    emit(code, f"{label}: {message}", subject=subject, path=path)
 
 
 def _focus_in_local_namespace(uri: str, local_namespaces: set[str]) -> bool:
@@ -1099,6 +1182,32 @@ def _focus_in_local_namespace(uri: str, local_namespaces: set[str]) -> bool:
     pipeline already collects for namespace enforcement).
     """
     return any(uri.startswith(ns) for ns in local_namespaces)
+
+
+def _own_focus_nodes(
+    local_graph: Graph, local_namespaces: set[str] | None
+) -> list[URIRef]:
+    """The package's own IRI subjects — the focus-node allow-list handed to
+    pyshacl so it validates only resources the package authored.
+
+    Every IRI subject of ``local_graph`` (the package's own TTL, post
+    script:// expansion) is a candidate. When ``local_namespaces`` is known we
+    keep only subjects inside a declared matrix namespace; this drops the
+    handful of cross-vocabulary subjects (e.g. an ``rdfs:`` term the package
+    re-states) that aren't the author's resources. pyshacl intersects this list
+    with each shape's natural targets, so a shape only fires on an own subject —
+    never on the imported, already-validated closure.
+    """
+    out: list[URIRef] = []
+    for subject in set(local_graph.subjects()):
+        if not isinstance(subject, URIRef):
+            continue
+        if local_namespaces is not None and not _focus_in_local_namespace(
+            str(subject), local_namespaces
+        ):
+            continue
+        out.append(subject)
+    return out
 
 
 def _merge_cli_quality_shapes(graph: Graph) -> None:
@@ -1116,40 +1225,147 @@ def _merge_cli_quality_shapes(graph: Graph) -> None:
     graph.parse(data=shape_file.read_text(), format="turtle")
 
 
-# SPARQL SELECT backing the IRI-node target: every distinct IRI-identified
-# node appearing in subject or object position. isIRI() excludes blank nodes
-# and literals, giving exactly "all named resources" — the documented
-# selection semantics of the custom target.
-_IRI_NODE_TARGET_SELECT = (
-    "SELECT DISTINCT ?this WHERE { "
-    "{ ?this ?p ?o } UNION { ?s ?p ?this } "
-    "FILTER(isIRI(?this)) }"
-)
+def _extract_and_strip_iri_node_shapes(graph: Graph) -> list[_IRINodeConstraint]:
+    """Find every NodeShape whose ``sh:target`` object is typed
+    ``plgt:IRINodeTarget``, extract its ``sh:property`` constraints for native
+    evaluation, and remove those shapes from ``graph`` so a standard SHACL
+    engine never loads the opaque custom target.
 
-
-def _expand_iri_node_targets(graph: Graph) -> None:
-    """Rewrite the custom IRI-node SHACL target into a standard SHACL-AF
-    ``sh:SPARQLTarget`` so pyshacl can load and apply it.
-
-    A shape may declare ``sh:target [ a plgt:IRINodeTarget ]`` to select every
-    IRI-identified node in the data graph as a focus node. pyshacl has no
-    handler for this custom target type and raises ``ShapeLoadError`` while
-    loading the shapes graph. SHACL-AF's ``sh:SPARQLTarget`` is the standard,
-    pyshacl-supported way to express an arbitrary node-selection target, so we
-    re-type each such target node to ``sh:SPARQLTarget`` and attach a
-    ``sh:select`` that returns all IRI nodes. The rewrite is idempotent and a
-    no-op when no IRI-node target is present.
+    A NodeShape qualifies when one of its ``sh:target`` objects carries
+    ``a plgt:IRINodeTarget``. For each such shape we read every ``sh:property``
+    constraint (path, minCount, severity, message, source shape IRI) generically
+    from the graph — nothing is hardcoded — then strip the NodeShape's triples,
+    its ``sh:target`` blank-node closure, and each referenced property shape's
+    closure. Mutates ``graph`` in place; returns the constraints (which may be
+    empty when no such shape is present).
     """
-    target_nodes = list(graph.subjects(RDF_TYPE, PLGT_IRI_NODE_TARGET))
-    if not target_nodes:
+    target_objs = {
+        target
+        for target in graph.objects(None, SH_NS.target)
+        if (target, RDF_TYPE, PLGT_IRI_NODE_TARGET) in graph
+    }
+    if not target_objs:
+        return []
+    node_shapes = {
+        subject
+        for target in target_objs
+        for subject in graph.subjects(SH_NS.target, target)
+    }
+
+    constraints: list[_IRINodeConstraint] = []
+    for shape in node_shapes:
+        for prop in graph.objects(shape, SH_NS.property):
+            constraint = _read_iri_node_constraint(graph, prop)
+            if constraint is not None:
+                constraints.append(constraint)
+
+    # Strip the qualifying shapes (and their property/target closures) so
+    # pyshacl never sees the custom target.
+    for shape in node_shapes:
+        for prop in list(graph.objects(shape, SH_NS.property)):
+            _remove_node_closure(graph, prop)
+        for target in list(graph.objects(shape, SH_NS.target)):
+            _remove_node_closure(graph, target)
+        _remove_node_closure(graph, shape)
+
+    return constraints
+
+
+def _read_iri_node_constraint(graph: Graph, prop_shape) -> _IRINodeConstraint | None:
+    """Read one ``sh:property`` of a ``plgt:IRINodeTarget`` shape into an
+    ``_IRINodeConstraint``. Returns ``None`` when the property shape has no
+    ``sh:path`` URI (nothing to evaluate). ``sh:minCount`` defaults to 1 when
+    absent — the advisory shapes are minCount-only nudges.
+    """
+    path = next(graph.objects(prop_shape, SH_NS.path), None)
+    if not isinstance(path, URIRef):
+        return None
+
+    min_count_lit = next(graph.objects(prop_shape, SH_NS.minCount), None)
+    try:
+        min_count = int(min_count_lit) if min_count_lit is not None else 1
+    except (TypeError, ValueError):
+        min_count = 1
+
+    severity = next(graph.objects(prop_shape, SH_NS.severity), None)
+    severity = severity if isinstance(severity, URIRef) else None
+
+    message_lit = next(graph.objects(prop_shape, SH_NS.message), None)
+    message = str(message_lit) if message_lit is not None else None
+
+    source_shape = str(prop_shape) if isinstance(prop_shape, URIRef) else None
+
+    return _IRINodeConstraint(path, min_count, severity, message, source_shape)
+
+
+def _remove_node_closure(graph: Graph, root) -> None:
+    """Remove ``root``'s triples and the closure of every blank node reachable
+    from it. Named (URI) objects are NOT followed — only the anonymous
+    structure that belongs to ``root`` — so stripping one shape never deletes a
+    sibling shape that happens to be referenced by URI.
+    """
+    nested_blanks = [
+        obj for obj in graph.objects(root, None) if isinstance(obj, rdflib.BNode)
+    ]
+    graph.remove((root, None, None))
+    for nested in nested_blanks:
+        _remove_node_closure(graph, nested)
+
+
+def _evaluate_iri_node_targets(
+    data_graph: Graph,
+    constraints: list[_IRINodeConstraint],
+    bag: DiagnosticBag,
+    *,
+    local_namespaces: set[str] | None = None,
+    subject_origin: dict[URIRef, str] | None = None,
+) -> None:
+    """Native evaluation of the ``plgt:IRINodeTarget`` advisory shapes.
+
+    For each named IRI subject in ``data_graph`` and each ``constraint``: count
+    the node's values for the constraint's ``sh:path``; when below
+    ``min_count`` emit a finding carrying the constraint's severity and message.
+    Blank nodes are skipped (``isURI`` is the custom target's selector). The
+    custom target selects nodes in subject OR object position; iterating the
+    data graph's subjects covers exactly the package's own authored resources
+    (the only ones that can be missing a label/comment the author controls).
+
+    When ``local_namespaces`` is supplied, only nodes in those namespaces are
+    reported (dependency resources are never the author's to fix). When
+    ``None`` (legacy unit-test callers) every IRI subject is reported.
+    """
+    if not constraints:
         return
-    select = Literal(_IRI_NODE_TARGET_SELECT)
-    for node in target_nodes:
-        graph.remove((node, RDF_TYPE, PLGT_IRI_NODE_TARGET))
-        graph.add((node, RDF_TYPE, SH_NS.SPARQLTarget))
-        # Only set sh:select if absent so repeated calls stay idempotent.
-        if (node, SH_NS.select, None) not in graph:
-            graph.add((node, SH_NS.select, select))
+    seen: set[tuple[str, str]] = set()
+    for node in set(data_graph.subjects()):
+        if not isinstance(node, URIRef):
+            continue  # blank nodes are never targeted
+        node_str = str(node)
+        if local_namespaces is not None and not _focus_in_local_namespace(
+            node_str, local_namespaces
+        ):
+            continue
+        for c in constraints:
+            if len(list(data_graph.objects(node, c.path))) >= c.min_count:
+                continue
+            key = (node_str, str(c.path))
+            if key in seen:
+                continue  # overlapping imports can register identical constraints
+            seen.add(key)
+            parts = []
+            if c.message:
+                parts.append(c.message)
+            if c.source_shape:
+                parts.append(f"(shape <{c.source_shape}>)")
+            message = " — ".join(parts) if parts else "SHACL violation"
+            path = subject_origin.get(node) if subject_origin else None
+            _emit_shacl_finding(
+                bag,
+                str(c.severity) if c.severity else "",
+                message,
+                node_str,
+                path,
+            )
 
 
 # ---------------------------------------------------------------------------
