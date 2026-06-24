@@ -10,9 +10,11 @@ file is diff-friendly and CI / pre-commit can drift-check by regenerating
 and comparing.
 
 Schema is versioned via the top-level ``schemaVersion``. Bump only when
-the JSON shape itself changes — adding a CLI command or flag does not
-bump the schema, it bumps the ``version`` field (which mirrors the
-package version).
+the JSON shape itself changes — adding a CLI command or flag does not bump
+it. The surface intentionally carries NO package version: it describes the
+CLI's structure, not a release, and embedding a value that changes every
+commit would make this committed file permanently fail its own drift check.
+Consumers that need the version use the git tag they pulled the surface from.
 """
 
 from __future__ import annotations
@@ -95,16 +97,6 @@ def _walk(cmd: click.Command, path: list[str], out: list[dict[str, Any]]) -> Non
     out.append(_command_to_dict(cmd, path))
 
 
-def _package_version() -> str:
-    from importlib.metadata import PackageNotFoundError
-    from importlib.metadata import version as _v
-
-    try:
-        return _v("plgt")
-    except PackageNotFoundError:
-        return "0.0.0+unknown"
-
-
 def build_surface() -> dict[str, Any]:
     # Importing __main__ executes the typer wiring (add_typer calls).
     main_mod = import_module("plgt.__main__")
@@ -118,7 +110,6 @@ def build_surface() -> dict[str, Any]:
     return {
         "schemaVersion": SCHEMA_VERSION,
         "cli": "plgt",
-        "version": _package_version(),
         "commands": commands,
     }
 
