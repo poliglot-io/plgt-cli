@@ -18,7 +18,10 @@ from plgt.services.deps_lockfile import (
     Lockfile,
     write_lockfile,
 )
-from plgt.services.validation_pipeline import validate_project
+from plgt.services.validation_pipeline import (
+    _run_shacl_validation,
+    validate_project,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -824,3 +827,87 @@ class TestVariablesAndSecrets:
         # At least one of the variable codes should fire (E0703 if synthesized, otherwise
         # E0701 from missing fields, or W0701 informational).
         assert any(c in codes for c in ("PLGT_E0701", "PLGT_E0703", "PLGT_W0701"))
+
+
+class TestCustomIriNodeTarget:
+    """A shape may use a custom SHACL target type that selects every
+    IRI-identified node in the data graph. pyshacl does not recognize this
+    custom target and raises ShapeLoadError on load; the pipeline expands it
+    into an equivalent SHACL-AF sh:SPARQLTarget so the shape loads and runs.
+    """
+
+    # Self-contained SHACL using the custom IRI-node target. The shape demands
+    # an rdfs:label (sh:Warning severity) on every named (IRI) node. No
+    # dependency on any internal spec file.
+    _FIXTURE = (
+        "@prefix sh:   <http://www.w3.org/ns/shacl#> .\n"
+        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+        "@prefix plgt: <https://poliglot.io/os/spec#> .\n"
+        "@prefix ex:   <https://example.com/test#> .\n"
+        "\n"
+        "ex:LabeledNodeShape a sh:NodeShape ;\n"
+        "    sh:target [ a plgt:IRINodeTarget ] ;\n"
+        "    sh:property [\n"
+        "        sh:path rdfs:label ;\n"
+        "        sh:minCount 1 ;\n"
+        "        sh:severity sh:Warning ;\n"
+        '        sh:message "named node should carry an rdfs:label" ;\n'
+        "    ] .\n"
+        "\n"
+        "# An IRI node that satisfies the shape (has a label).\n"
+        'ex:Documented rdfs:label "documented" .\n'
+        "# An IRI node that violates the shape (no label) — should be selected\n"
+        "# by the custom target and surface a warning.\n"
+        "ex:Undocumented a ex:Thing .\n"
+    )
+
+    def test_custom_target_loads_without_shapeload_error(self) -> None:
+        """The shape graph loads and validates: no ShapeLoadError surfaces as
+        a PLGT_E0500 SHACL-could-not-run diagnostic.
+        """
+        import rdflib
+
+        from plgt.services.diagnostics import DiagnosticBag
+
+        graph = rdflib.Graph()
+        graph.parse(data=self._FIXTURE, format="turtle")
+        bag = DiagnosticBag()
+
+        _run_shacl_validation(graph, project_dir=None, bag=bag)  # type: ignore[arg-type]
+
+        # The "SHACL validation could not run" error is exactly what
+        # ShapeLoadError produced before the fix. It must be absent.
+        run_failures = [
+            d
+            for d in bag.diagnostics
+            if d.code == "PLGT_E0500" and "could not run" in d.message
+        ]
+        assert not run_failures, (
+            "custom IRI-node target should load cleanly, but SHACL failed: "
+            f"{[d.message for d in run_failures]}"
+        )
+
+    def test_custom_target_selects_iri_nodes(self) -> None:
+        """The expanded target actually applies: the unlabeled IRI node is
+        selected as a focus node and produces the expected warning, while the
+        labeled node does not.
+        """
+        import rdflib
+
+        from plgt.services.diagnostics import DiagnosticBag
+
+        graph = rdflib.Graph()
+        graph.parse(data=self._FIXTURE, format="turtle")
+        bag = DiagnosticBag()
+
+        _run_shacl_validation(graph, project_dir=None, bag=bag)  # type: ignore[arg-type]
+
+        warnings = [d for d in bag.diagnostics if d.code == "PLGT_W0500"]
+        subjects = {d.subject for d in warnings}
+        assert "https://example.com/test#Undocumented" in subjects, (
+            "the unlabeled IRI node should be selected by the custom target "
+            f"and warned; got warnings for {subjects}"
+        )
+        assert "https://example.com/test#Documented" not in subjects, (
+            "the labeled IRI node satisfies the shape and must not warn"
+        )
