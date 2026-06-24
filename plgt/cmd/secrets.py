@@ -12,7 +12,11 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from plgt.clients.secrets_client import SecretsClient
+from plgt.clients.secrets_client import (
+    SCOPE_PRINCIPAL,
+    SCOPE_WORKSPACE,
+    SecretsClient,
+)
 from plgt.core import config
 from plgt.core.exceptions import ResourceNotFoundError, ServiceError
 
@@ -213,13 +217,36 @@ def set_secret(
         "--from-stdin",
         help="Read value from stdin instead of interactive prompt.",
     ),
+    scope: str = typer.Option(
+        SCOPE_WORKSPACE,
+        "--scope",
+        help="Scope to write the value at: 'workspace' (shared) or 'principal' (private to you).",
+    ),
+    scope_entity_id: str | None = typer.Option(
+        None,
+        "--scope-entity-id",
+        help="Principal id to write for. Required when --scope principal.",
+    ),
 ):
     """Set a secret's value.
 
-    By default prompts for the value interactively (masked input).
-    Use --from-stdin to pipe the value.
+    Writes to the 'workspace' scope by default (shared by everyone in the
+    workspace). Pass --scope principal to set a value private to a single
+    principal. By default prompts for the value interactively (masked input);
+    use --from-stdin to pipe the value.
     """
     try:
+        if scope not in (SCOPE_WORKSPACE, SCOPE_PRINCIPAL):
+            console.print(
+                f"[red]Invalid --scope '{scope}'. Use '{SCOPE_WORKSPACE}' or '{SCOPE_PRINCIPAL}'.[/red]"
+            )
+            raise typer.Exit(1)
+        if scope == SCOPE_PRINCIPAL and not scope_entity_id:
+            console.print(
+                "[red]--scope-entity-id is required when --scope principal.[/red]"
+            )
+            raise typer.Exit(1)
+
         target_workspace = _get_workspace(workspace)
         client = _get_client()
 
@@ -251,8 +278,14 @@ def set_secret(
                 console.print("[red]Value cannot be empty.[/red]")
                 raise typer.Exit(1)
 
-        # Set the value
-        client.set_secret_value(target_workspace, secret_uri, secret_value)
+        # Set the value at the requested scope
+        client.set_secret_value(
+            target_workspace,
+            secret_uri,
+            secret_value,
+            scope=scope,
+            scope_entity_id=scope_entity_id,
+        )
         console.print("[green]Secret value updated.[/green]")
 
     except ServiceError as e:

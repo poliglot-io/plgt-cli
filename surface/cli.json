@@ -1377,7 +1377,7 @@
     },
     {
       "deprecated": false,
-      "help": "Set a secret's value.\n\nBy default prompts for the value interactively (masked input).\nUse --from-stdin to pipe the value.",
+      "help": "Set a secret's value.\n\nWrites to the 'workspace' scope by default (shared by everyone in the\nworkspace). Pass --scope principal to set a value private to a single\nprincipal. By default prompts for the value interactively (masked input);\nuse --from-stdin to pipe the value.",
       "hidden": false,
       "params": [
         {
@@ -1416,6 +1416,30 @@
           "positional": false,
           "required": false,
           "type": "boolean"
+        },
+        {
+          "default": "workspace",
+          "flag": false,
+          "help": "Scope to write the value at: 'workspace' (shared) or 'principal' (private to you).",
+          "name": "scope",
+          "opts": [
+            "--scope"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": null,
+          "flag": false,
+          "help": "Principal id to write for. Required when --scope principal.",
+          "name": "scope_entity_id",
+          "opts": [
+            "--scope-entity-id"
+          ],
+          "positional": false,
+          "required": false,
+          "type": "string"
         }
       ],
       "path": [
@@ -1923,5 +1947,5 @@
     }
   ],
   "schemaVersion": "1.0.0",
-  "version": "0.1.0b11"
+  "version": "0.1.0b12"
 }

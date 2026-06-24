@@ -279,7 +279,11 @@ class TestSet:
         assert result.exit_code == 0
         assert "Secret value updated" in result.output
         mock_client.set_secret_value.assert_called_once_with(
-            "test-workspace", "mymatrix:OpenAIAPIKey", "my-secret-value"
+            "test-workspace",
+            "mymatrix:OpenAIAPIKey",
+            "my-secret-value",
+            scope="workspace",
+            scope_entity_id=None,
         )
 
     @patch("plgt.cmd.secrets.sys")
@@ -307,7 +311,11 @@ class TestSet:
         assert result.exit_code == 0
         assert "Secret value updated" in result.output
         mock_client.set_secret_value.assert_called_once_with(
-            "test-workspace", "mymatrix:OpenAIAPIKey", "piped-secret-value"
+            "test-workspace",
+            "mymatrix:OpenAIAPIKey",
+            "piped-secret-value",
+            scope="workspace",
+            scope_entity_id=None,
         )
 
     @patch("plgt.cmd.secrets.config")

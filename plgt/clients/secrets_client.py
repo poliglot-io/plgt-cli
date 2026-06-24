@@ -23,6 +23,10 @@ from plgt.models.secret import Secret
 
 logger = logging.getLogger(__name__)
 
+# Scope tokens a secret value can be written/read at.
+SCOPE_WORKSPACE = "workspace"
+SCOPE_PRINCIPAL = "principal"
+
 
 class SecretsClient:
     """Client for secrets API operations."""
@@ -186,28 +190,36 @@ class SecretsClient:
         workspace: str,
         secret_id: str,
         value: str,
+        scope: str = SCOPE_WORKSPACE,
+        scope_entity_id: str | None = None,
     ) -> None:
-        """Set a secret's value with E2E encryption.
+        """Set a secret's value at a scope, with E2E encryption.
 
         Protocol:
         1. POST /pubkey to get server's ephemeral public key and keyId
         2. Generate client ephemeral keypair
         3. Derive shared secret via ECDH + BLAKE2b
         4. Encrypt value with XChaCha20-Poly1305
-        5. PUT encrypted payload with keyId
+        5. PUT encrypted payload with keyId + scope
 
         Args:
             workspace: The workspace slug.
             secret_id: The secret ID (e.g., "matrix:SecretName").
             value: The secret value to set.
+            scope: Which scope to write the value at — ``"workspace"`` (shared
+                by every principal in the workspace) or ``"principal"`` (private
+                to one principal). Defaults to ``"workspace"``.
+            scope_entity_id: The principal id to write for, required when
+                ``scope="principal"`` and ignored otherwise.
 
         Raises:
             ServiceError: If the request or encryption fails.
         """
         logger.debug(
-            "Setting secret value %s in workspace %s",
+            "Setting secret value %s in workspace %s at scope %s",
             secret_id,
             workspace,
+            scope,
         )
 
         try:
@@ -225,19 +237,24 @@ class SecretsClient:
             # Step 2-4: Generate keypair, derive shared secret, encrypt
             encrypted, _ = encrypt_secret_value(value, server_public_key)
 
-            # Step 5: Send encrypted payload
+            # Step 5: Send encrypted payload at the requested scope
+            body = {
+                "encryptedValue": base64.b64encode(encrypted.encrypted_value).decode(
+                    "ascii"
+                ),
+                "nonce": base64.b64encode(encrypted.nonce).decode("ascii"),
+                "clientPublicKey": base64.b64encode(encrypted.client_public_key).decode(
+                    "ascii"
+                ),
+                "keyId": key_id,
+                "scope": scope,
+            }
+            if scope_entity_id is not None:
+                body["scopeEntityId"] = scope_entity_id
+
             self.session.put(
                 f"/api/v1/secrets/{workspace}/{secret_id}/value",
-                json={
-                    "encryptedValue": base64.b64encode(
-                        encrypted.encrypted_value
-                    ).decode("ascii"),
-                    "nonce": base64.b64encode(encrypted.nonce).decode("ascii"),
-                    "clientPublicKey": base64.b64encode(
-                        encrypted.client_public_key
-                    ).decode("ascii"),
-                    "keyId": key_id,
-                },
+                json=body,
             )
 
         except ValueError as e:

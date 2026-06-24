@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0b12] — beta
+
+### Added
+
+- `plgt secret set` now writes secret values at a chosen **scope**. A new
+  `--scope` option selects `workspace` (shared by everyone in the workspace,
+  the default) or `principal` (private to a single principal), with
+  `--scope-entity-id` naming the principal for the latter. The scope is sent
+  with every value write.
+
 ## [0.1.0b10] — beta
 
 ### Fixed
