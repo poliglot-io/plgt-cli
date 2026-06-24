@@ -1946,6 +1946,5 @@
       "shortHelp": "Yank a published version so it disappears..."
     }
   ],
-  "schemaVersion": "1.0.0",
-  "version": "0.1.0b12"
+  "schemaVersion": "1.0.0"
 }

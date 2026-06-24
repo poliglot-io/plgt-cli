@@ -1,6 +1,8 @@
 [project]
 name = "plgt"
-version = "0.1.0b12"
+# Version is derived from the latest git tag by setuptools_scm (see
+# [tool.setuptools_scm]); do not hardcode it here. Release = tag + push.
+dynamic = ["version"]
 description = "Poliglot developer CLI"
 readme = "README.md"
 requires-python = ">=3.12, <3.13"
@@ -70,8 +72,13 @@ testpaths = [
 ]
 
 [build-system]
-requires = ["setuptools>=77.0.0", "wheel"]
+requires = ["setuptools>=77.0.0", "wheel", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
+
+# Derive the version from git tags (e.g. tag `v0.1.0b12` -> version `0.1.0b12`).
+# Between tags, builds get a `.devN` suffix off the next guessed version. An
+# enabling table is all that's needed; defaults match the existing `vX` tags.
+[tool.setuptools_scm]
 
 [tool.setuptools.packages.find]
 include = ["plgt*"]

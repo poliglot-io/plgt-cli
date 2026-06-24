@@ -22,6 +22,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
+          # Full history + tags so setuptools_scm can derive the version from the tag.
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -41,18 +43,21 @@ jobs:
       - name: Tests
         run: uv run pytest -q
 
-      - name: Verify tag matches pyproject version
-        run: |
-          PKG_VERSION="v$(grep -E '^version = ' pyproject.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
-          REF_TAG="${GITHUB_REF#refs/tags/}"
-          if [ -n "${{ inputs.tag }}" ]; then REF_TAG="${{ inputs.tag }}"; fi
-          if [ "$PKG_VERSION" != "$REF_TAG" ]; then
-            echo "Tag $REF_TAG does not match pyproject.toml version $PKG_VERSION"
-            exit 1
-          fi
-
       - name: Build sdist + wheel
         run: uv build
+
+      # The version is derived from the tag by setuptools_scm, so build output and
+      # tag can't drift — but assert it anyway to fail fast if tags weren't fetched
+      # (a shallow checkout would otherwise yield a 0.0.0 dev version).
+      - name: Verify built version matches tag
+        run: |
+          REF_TAG="${{ inputs.tag || github.ref_name }}"
+          EXPECTED="${REF_TAG#v}"
+          if ! ls "dist/plgt-${EXPECTED}.tar.gz" >/dev/null 2>&1; then
+            echo "Built dist does not match tag ${REF_TAG} (expected version ${EXPECTED}):"
+            ls -1 dist/
+            exit 1
+          fi
 
       - name: Publish to PyPI (trusted publisher OIDC)
         uses: pypa/gh-action-pypi-publish@release/v1
