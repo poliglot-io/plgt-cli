@@ -92,6 +92,14 @@ PLGT_BUILD_REQUIRED = URIRef("https://poliglot.io/os/spec/build#required")
 PLGT_SCRT_MANAGED_SECRET = URIRef("https://poliglot.io/os/spec/secrets#ManagedSecret")
 PLGT_SCRT_DESCRIPTION = URIRef("https://poliglot.io/os/spec/secrets#description")
 
+# Custom SHACL target type that selects every IRI-identified (non-blank,
+# non-literal) node in the data graph as a focus node. pyshacl does not know
+# this target out of the box, so we expand it into an equivalent SHACL-AF
+# sh:SPARQLTarget before validation (see _expand_iri_node_targets).
+PLGT_IRI_NODE_TARGET = URIRef("https://poliglot.io/os/spec#IRINodeTarget")
+
+SH_NS = rdflib.Namespace("http://www.w3.org/ns/shacl#")
+
 
 @dataclass
 class ValidationResult:
@@ -988,6 +996,14 @@ def _run_shacl_validation(
         # system matrix shapes.
         _merge_cli_quality_shapes(graph)
 
+        # The system matrix ships a shape whose sh:target is the custom
+        # plgt:IRINodeTarget target type (selects all IRI-identified nodes).
+        # pyshacl does not recognize this custom target and raises
+        # ShapeLoadError on load. Rewrite it to an equivalent SHACL-AF
+        # sh:SPARQLTarget so the shape loads and applies with the intended
+        # semantics. No-op when no such target is present.
+        _expand_iri_node_targets(graph)
+
         # Shapes already live in the assembled graph (system matrix + local
         # shapes were merged in phase 3, CLI-only shapes merged just above).
         # Passing the same graph as data_graph AND shacl_graph AND ont_graph
@@ -1098,6 +1114,42 @@ def _merge_cli_quality_shapes(graph: Graph) -> None:
     """
     shape_file = resources.files("plgt.services.shapes") / "quality.ttl"
     graph.parse(data=shape_file.read_text(), format="turtle")
+
+
+# SPARQL SELECT backing the IRI-node target: every distinct IRI-identified
+# node appearing in subject or object position. isIRI() excludes blank nodes
+# and literals, giving exactly "all named resources" — the documented
+# selection semantics of the custom target.
+_IRI_NODE_TARGET_SELECT = (
+    "SELECT DISTINCT ?this WHERE { "
+    "{ ?this ?p ?o } UNION { ?s ?p ?this } "
+    "FILTER(isIRI(?this)) }"
+)
+
+
+def _expand_iri_node_targets(graph: Graph) -> None:
+    """Rewrite the custom IRI-node SHACL target into a standard SHACL-AF
+    ``sh:SPARQLTarget`` so pyshacl can load and apply it.
+
+    A shape may declare ``sh:target [ a plgt:IRINodeTarget ]`` to select every
+    IRI-identified node in the data graph as a focus node. pyshacl has no
+    handler for this custom target type and raises ``ShapeLoadError`` while
+    loading the shapes graph. SHACL-AF's ``sh:SPARQLTarget`` is the standard,
+    pyshacl-supported way to express an arbitrary node-selection target, so we
+    re-type each such target node to ``sh:SPARQLTarget`` and attach a
+    ``sh:select`` that returns all IRI nodes. The rewrite is idempotent and a
+    no-op when no IRI-node target is present.
+    """
+    target_nodes = list(graph.subjects(RDF_TYPE, PLGT_IRI_NODE_TARGET))
+    if not target_nodes:
+        return
+    select = Literal(_IRI_NODE_TARGET_SELECT)
+    for node in target_nodes:
+        graph.remove((node, RDF_TYPE, PLGT_IRI_NODE_TARGET))
+        graph.add((node, RDF_TYPE, SH_NS.SPARQLTarget))
+        # Only set sh:select if absent so repeated calls stay idempotent.
+        if (node, SH_NS.select, None) not in graph:
+            graph.add((node, SH_NS.select, select))
 
 
 # ---------------------------------------------------------------------------
