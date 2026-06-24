@@ -1003,3 +1003,285 @@ class TestCustomIriNodeTarget:
             rdflib.URIRef("http://www.w3.org/2000/01/rdf-schema#label"),
             rdflib.Literal("documented"),
         ) in graph
+
+
+class TestShaclInferenceAndFocusScoping:
+    """SHACL must run with RDFS inference (so the materialized type hierarchy
+    matches what the runtime validates against) while restricting the FOCUS to
+    the package's own subjects (so the already-published imported closure is
+    not re-validated — and a broad quality shape doesn't fan out across it).
+
+    Each test drives the full pipeline via ``validate_project`` and plants the
+    system shapes + ontology in the engine cache (which the pipeline merges
+    into the assembled graph), exactly as a real system matrix would publish
+    them. The package's own TTL lives under ``spec/``.
+    """
+
+    _MATRIX = "https://example.com/test#"
+
+    @staticmethod
+    def _shacl_findings(result):
+        return [
+            d
+            for d in result.diagnostics.diagnostics
+            if d.code in ("PLGT_E0500", "PLGT_W0500", "PLGT_I0500")
+        ]
+
+    def test_inferred_type_fires_shape_no_drift(self, tmp_path: "Path") -> None:
+        """The key regression guard against #29's drift: an OWN subject whose
+        matching type is materialized only by RDFS inference DOES get validated
+        and the shape's violation fires. Without RDFS inference (what #29
+        shipped) this shape silently never runs — exactly the drift this guards.
+
+        The type is derived by ``rdfs:domain`` entailment, NOT ``rdfs:subClassOf``:
+        SHACL's ``sh:targetClass`` honours subclasses natively even without
+        inference, so a subclass axiom would NOT distinguish the two modes.
+        Domain/range entailment is pure RDFS — SHACL does not perform it — so it
+        fires only when the inferred type is materialized into the data graph.
+        """
+        # Engine cache: a predicate whose rdfs:domain is sys:LivingThing, plus a
+        # NodeShape targeting sys:LivingThing that requires a label. The own
+        # subject uses that predicate but is never explicitly typed, so it is a
+        # LivingThing ONLY via RDFS domain entailment.
+        ontology = (
+            "@prefix sys:  <https://poliglot.io/os/spec#> .\n"
+            "@prefix sh:   <http://www.w3.org/ns/shacl#> .\n"
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            "sys:LivingThing a rdfs:Class .\n"
+            "sys:hasOrgan rdfs:domain sys:LivingThing .\n"
+            "sys:LivingThingShape a sh:NodeShape ;\n"
+            "    sh:targetClass sys:LivingThing ;\n"
+            "    sh:property [\n"
+            "        sh:path rdfs:label ;\n"
+            "        sh:minCount 1 ;\n"
+            "        sh:severity sh:Violation ;\n"
+            '        sh:message "LivingThing needs a label" ;\n'
+            "    ] .\n"
+        )
+        own = (
+            "@prefix ex:  <https://example.com/test#> .\n"
+            "@prefix sys: <https://poliglot.io/os/spec#> .\n"
+            # No rdfs:label and no explicit type. Type LivingThing is materialized
+            # only by RDFS domain entailment over sys:hasOrgan.
+            "ex:Dog sys:hasOrgan ex:Heart .\n"
+        )
+        proj = _scaffold(
+            tmp_path,
+            matrix_namespace=self._MATRIX,
+            extra_ttl={"data.ttl": own},
+        )
+        engine_dir = cache_dir_for(proj, "poliglot", "os", "1.0.0", workspace=None)
+        (engine_dir / "ontology.ttl").write_text(ontology)
+
+        result = validate_project(proj)
+        findings = self._shacl_findings(result)
+        dog_violations = [
+            d
+            for d in findings
+            if d.subject == "https://example.com/test#Dog" and d.code == "PLGT_E0500"
+        ]
+        assert dog_violations, (
+            "the own subject ex:Dog should be validated against the "
+            "LivingThing shape via its INFERRED type; without inference this "
+            f"shape silently never fires. Got SHACL findings: "
+            f"{[(d.code, d.subject, d.message) for d in findings]}"
+        )
+        assert any("LivingThing needs a label" in d.message for d in dog_violations)
+
+    def test_cross_matrix_relationship_validated(self, tmp_path: "Path") -> None:
+        """An own subject referencing an imported, typed resource is validated
+        against its relationship constraint (the imported resource's type, as
+        seen through the inferred import graph, satisfies the constraint) — but
+        the imported resource's OWN shape is NOT evaluated.
+        """
+        # Engine cache: a Permission shape requiring its sys:requests object to
+        # be a sys:Action (sh:class), PLUS an Action shape requiring a label.
+        # The imported action is correctly typed (so the relationship check
+        # passes) but carries NO label (so if its own shape ran, it would fire).
+        ontology = (
+            "@prefix sys:  <https://poliglot.io/os/spec#> .\n"
+            "@prefix dep:  <https://dependency.example/spec#> .\n"
+            "@prefix sh:   <http://www.w3.org/ns/shacl#> .\n"
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            "sys:Action a rdfs:Class .\n"
+            "sys:Permission a rdfs:Class .\n"
+            # Relationship constraint on the OWN subject's class.
+            "sys:PermissionShape a sh:NodeShape ;\n"
+            "    sh:targetClass sys:Permission ;\n"
+            "    sh:property [\n"
+            "        sh:path sys:requests ;\n"
+            "        sh:minCount 1 ;\n"
+            "        sh:class sys:Action ;\n"
+            "        sh:severity sh:Violation ;\n"
+            '        sh:message "requests must resolve to an Action" ;\n'
+            "    ] .\n"
+            # The imported resource's OWN shape — must NOT run here.
+            "sys:ActionShape a sh:NodeShape ;\n"
+            "    sh:targetClass sys:Action ;\n"
+            "    sh:property [\n"
+            "        sh:path rdfs:label ;\n"
+            "        sh:minCount 1 ;\n"
+            "        sh:severity sh:Violation ;\n"
+            '        sh:message "Action needs a label" ;\n'
+            "    ] .\n"
+            # Imported, correctly-typed but unlabeled action.
+            "dep:RealAction a sys:Action .\n"
+        )
+        own = (
+            "@prefix ex:  <https://example.com/test#> .\n"
+            "@prefix sys: <https://poliglot.io/os/spec#> .\n"
+            "@prefix dep: <https://dependency.example/spec#> .\n"
+            "ex:Perm a sys:Permission ;\n"
+            "    sys:requests dep:RealAction .\n"
+        )
+        proj = _scaffold(
+            tmp_path,
+            matrix_namespace=self._MATRIX,
+            extra_ttl={"data.ttl": own},
+        )
+        engine_dir = cache_dir_for(proj, "poliglot", "os", "1.0.0", workspace=None)
+        (engine_dir / "ontology.ttl").write_text(ontology)
+
+        result = validate_project(proj)
+        findings = self._shacl_findings(result)
+
+        # The relationship check ran and PASSED — the object resolves to an
+        # Action, so there is no requests-constraint violation on ex:Perm.
+        perm_requests_violation = [
+            d
+            for d in findings
+            if d.subject == "https://example.com/test#Perm"
+            and "requests must resolve to an Action" in d.message
+        ]
+        assert not perm_requests_violation, (
+            "the cross-matrix relationship should validate cleanly (the object "
+            f"resolves to a typed Action): {perm_requests_violation}"
+        )
+
+        # The imported resource's OWN shape did NOT run: dep:RealAction is
+        # unlabeled but is not a focus node, so no Action-needs-a-label finding.
+        dep_findings = [
+            d
+            for d in findings
+            if d.subject == "https://dependency.example/spec#RealAction"
+        ]
+        assert not dep_findings, (
+            "the imported resource's own shape must NOT be re-evaluated; "
+            f"got findings on the import: {[(d.code, d.message) for d in dep_findings]}"
+        )
+
+    def test_relationship_constraint_violation_fires_on_own_subject(
+        self, tmp_path: "Path"
+    ) -> None:
+        """Counterpart to the happy-path cross-matrix test: when the own
+        subject's reference does NOT resolve to a correctly-typed imported
+        resource, the relationship constraint fires on the OWN subject. Proves
+        the constraint is genuinely evaluated (not skipped along with the
+        import's own shapes).
+        """
+        ontology = (
+            "@prefix sys:  <https://poliglot.io/os/spec#> .\n"
+            "@prefix dep:  <https://dependency.example/spec#> .\n"
+            "@prefix sh:   <http://www.w3.org/ns/shacl#> .\n"
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            "sys:Action a rdfs:Class .\n"
+            "sys:Permission a rdfs:Class .\n"
+            "sys:PermissionShape a sh:NodeShape ;\n"
+            "    sh:targetClass sys:Permission ;\n"
+            "    sh:property [\n"
+            "        sh:path sys:requests ;\n"
+            "        sh:minCount 1 ;\n"
+            "        sh:class sys:Action ;\n"
+            "        sh:severity sh:Violation ;\n"
+            '        sh:message "requests must resolve to an Action" ;\n'
+            "    ] .\n"
+            # The referenced import is NOT a sys:Action (wrong type).
+            "dep:NotAnAction a sys:Permission .\n"
+        )
+        own = (
+            "@prefix ex:  <https://example.com/test#> .\n"
+            "@prefix sys: <https://poliglot.io/os/spec#> .\n"
+            "@prefix dep: <https://dependency.example/spec#> .\n"
+            "ex:Perm a sys:Permission ;\n"
+            "    sys:requests dep:NotAnAction .\n"
+        )
+        proj = _scaffold(
+            tmp_path,
+            matrix_namespace=self._MATRIX,
+            extra_ttl={"data.ttl": own},
+        )
+        engine_dir = cache_dir_for(proj, "poliglot", "os", "1.0.0", workspace=None)
+        (engine_dir / "ontology.ttl").write_text(ontology)
+
+        result = validate_project(proj)
+        findings = self._shacl_findings(result)
+        perm_violations = [
+            d
+            for d in findings
+            if d.subject == "https://example.com/test#Perm"
+            and "requests must resolve to an Action" in d.message
+        ]
+        assert perm_violations, (
+            "the relationship constraint must fire on the own subject when the "
+            f"referenced import is the wrong type: {[d.message for d in findings]}"
+        )
+
+    def test_import_namespace_subject_not_focused(self, tmp_path: "Path") -> None:
+        """Own-scoping: an import-namespace subject that would violate a system
+        shape (here: missing rdfs:label) is NOT reported — the focus stays on
+        the package's own subjects.
+        """
+        ontology = (
+            "@prefix sys:  <https://poliglot.io/os/spec#> .\n"
+            "@prefix dep:  <https://dependency.example/spec#> .\n"
+            "@prefix sh:   <http://www.w3.org/ns/shacl#> .\n"
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            "sys:Thing a rdfs:Class .\n"
+            "sys:ThingShape a sh:NodeShape ;\n"
+            "    sh:targetClass sys:Thing ;\n"
+            "    sh:property [\n"
+            "        sh:path rdfs:label ;\n"
+            "        sh:minCount 1 ;\n"
+            "        sh:severity sh:Violation ;\n"
+            '        sh:message "Thing needs a label" ;\n'
+            "    ] .\n"
+            # An import-namespace subject of the targeted class, unlabeled.
+            "dep:ImportedThing a sys:Thing .\n"
+        )
+        own = (
+            "@prefix ex:   <https://example.com/test#> .\n"
+            "@prefix sys:  <https://poliglot.io/os/spec#> .\n"
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            "ex:OwnThing a sys:Thing ;\n"
+            '    rdfs:label "own thing" .\n'
+        )
+        proj = _scaffold(
+            tmp_path,
+            matrix_namespace=self._MATRIX,
+            extra_ttl={"data.ttl": own},
+        )
+        engine_dir = cache_dir_for(proj, "poliglot", "os", "1.0.0", workspace=None)
+        (engine_dir / "ontology.ttl").write_text(ontology)
+
+        result = validate_project(proj)
+        findings = self._shacl_findings(result)
+        dep_findings = [
+            d
+            for d in findings
+            if d.subject == "https://dependency.example/spec#ImportedThing"
+        ]
+        assert not dep_findings, (
+            "an import-namespace subject must NOT be reported (focus stays on "
+            f"own subjects); got: {[(d.code, d.message) for d in dep_findings]}"
+        )
+        # And the own, labeled subject conforms — no Thing-needs-a-label finding
+        # on it either.
+        own_violations = [
+            d
+            for d in findings
+            if d.subject == "https://example.com/test#OwnThing"
+            and "Thing needs a label" in d.message
+        ]
+        assert not own_violations, (
+            f"the own labeled subject should conform: {own_violations}"
+        )

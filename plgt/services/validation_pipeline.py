@@ -282,12 +282,17 @@ def validate_project(
         project_dir, workspace, lockfile, local_graph, bag
     )
 
-    # Phase 6: SHACL validation. Shapes + the class hierarchy needed for RDFS
-    # inference come from the assembled graph (package + deps + system matrix),
-    # but the DATA pyshacl walks is scoped to the package's OWN resources
-    # (``local_graph``): the dependencies were already validated when published,
-    # so re-validating their resources here is wasted work — and over a large
-    # transitive closure (e.g. the system matrix) it dominates the run.
+    # Phase 6: SHACL validation. Runs over the assembled graph (package + deps
+    # + system matrix) with RDFS inference ON, so the materialized type
+    # hierarchy matches what the runtime validates against — a shape that
+    # should fire because of an INFERRED type fires here too. The performance
+    # win comes from scoping the FOCUS to the package's OWN subjects (the
+    # subjects ``local_graph`` contributes) rather than the whole inferred
+    # closure: each shape still computes its natural targets over the full
+    # inferred data, but only own subjects are validated, so a quality shape
+    # targeting e.g. rdfs:Resource doesn't fan out across the imported closure.
+    # Imported subjects' own shapes were already checked when their package
+    # was published.
     if assembled is not None:
         _run_shacl_validation(
             assembled,
@@ -997,15 +1002,26 @@ def _run_shacl_validation(
     local_namespaces: set[str] | None = None,
     subject_origin: dict[URIRef, str] | None = None,
 ) -> None:
-    """Run SHACL validation, scoped to the package's OWN resources.
+    """Run SHACL validation with RDFS inference, scoped to the package's OWN
+    subjects.
 
     ``graph`` is the assembled graph (package + deps + system matrix); it
-    carries every shape and the full class hierarchy RDFS inference needs.
+    carries every shape and the full class hierarchy. pyshacl validates over
+    this full graph with ``inference="rdfs"`` so the materialized type
+    hierarchy matches what the runtime sees — a shape that fires only because
+    of an INFERRED type fires here too (no build-vs-runtime drift). ``graph``
+    also stays the DATA graph so cross-matrix relationships (an own subject
+    referencing an imported, typed resource) resolve.
+
     ``local_graph`` is the package's own TTL (post script:// expansion). When
-    supplied, it is what pyshacl actually walks as the data graph, and what the
-    native IRI-node pass iterates — so the (already-published) dependency
-    resources are not re-validated. When ``None`` (legacy unit-test callers)
-    the assembled graph is used as the data graph, preserving old behavior.
+    supplied it is used to compute the FOCUS node list — the package's own IRI
+    subjects — which is handed to pyshacl's ``focus_nodes`` option. pyshacl
+    computes each shape's natural targets over the full inferred data graph and
+    then INTERSECTS them with the focus list, so only own subjects are
+    validated. Imported subjects' own shapes were already checked when their
+    package published, so they are not re-evaluated. When ``local_graph`` is
+    ``None`` (legacy unit-test callers) the assembled graph is the data graph
+    and no focus restriction is applied, preserving old behaviour.
 
     Two evaluation paths:
 
@@ -1021,7 +1037,8 @@ def _run_shacl_validation(
     import failure or a validator crash surfaces as a real PLGT_E0500 so a clean
     `plgt validate` cannot lie about whether shapes ran.
     """
-    data_graph = local_graph if local_graph is not None else graph
+    scoped = local_graph is not None
+    iri_node_data_graph = local_graph if scoped else graph
     try:
         import pyshacl
 
@@ -1037,39 +1054,39 @@ def _run_shacl_validation(
         iri_node_constraints = _extract_and_strip_iri_node_shapes(graph)
 
         # Native IRI-node pass: O(1) isURI test per node, no full-graph scan.
-        # Iterate only the data graph's own IRI subjects so dependency
-        # resources are never reported.
+        # Iterate only the package's own IRI subjects so dependency resources
+        # are never reported.
         _evaluate_iri_node_targets(
-            data_graph,
+            iri_node_data_graph,
             iri_node_constraints,
             bag,
             local_namespaces=local_namespaces,
             subject_origin=subject_origin,
         )
 
-        # pyshacl over the standard shapes. When a scoped local data graph is
-        # supplied, shacl_graph carries the assembled shapes + class hierarchy
-        # while data_graph holds only the package's own resources, so pyshacl
-        # walks just those (deps were validated when published).
+        # pyshacl over the standard shapes, with RDFS inference materialized so
+        # the type hierarchy matches the runtime. The data graph is the full
+        # assembled graph (so inferred types and cross-matrix references
+        # resolve); the FOCUS is restricted to the package's own IRI subjects
+        # via ``focus_nodes``. pyshacl computes each shape's natural targets
+        # over the inferred data graph, then intersects with the focus list —
+        # so a quality shape that targets a broad class (e.g. rdfs:Resource)
+        # does NOT fan out across the imported closure (the cost #29 traded
+        # correctness to avoid), while a constraint on an own subject that
+        # references an imported, inferred-typed resource still runs.
         #
-        # No RDFS inference. The system matrix already publishes its hierarchy
-        # in materialized form, so the types the shapes target are present
-        # without inference. Crucially, ``ont_graph`` is NOT passed: handing
-        # pyshacl the assembled graph as an ontology forces it to RDFS-infer
-        # over the entire transitive dependency closure (tens of thousands of
-        # triples with deep class hierarchies) — the operation that made this
-        # pass take many minutes. Inference also makes every node an
-        # rdfs:Resource, which would fire the targetClass-rdfs:Resource quality
-        # shape on thousands of nodes (pure noise). The legacy-caller path
-        # (no scoping graph) passes shacl_graph=None so pyshacl extracts shapes
-        # from data_graph directly, with no self-union doubling.
-        scoped = local_graph is not None
+        # The legacy-caller path (no scoping graph) passes the data graph as
+        # its own shapes source and applies no focus restriction.
+        focus_nodes = (
+            _own_focus_nodes(local_graph, local_namespaces) if scoped else None
+        )
         conforms, report_graph, _ = pyshacl.validate(
-            data_graph=data_graph,
+            data_graph=graph,
             shacl_graph=graph if scoped else None,
-            inference="none",
+            inference="rdfs",
             advanced=True,
             inplace=False,
+            focus_nodes=focus_nodes,
         )
     except Exception as e:  # noqa: BLE001 — pyshacl + its rdflib internals raise many shapes
         bag.error(
@@ -1165,6 +1182,32 @@ def _focus_in_local_namespace(uri: str, local_namespaces: set[str]) -> bool:
     pipeline already collects for namespace enforcement).
     """
     return any(uri.startswith(ns) for ns in local_namespaces)
+
+
+def _own_focus_nodes(
+    local_graph: Graph, local_namespaces: set[str] | None
+) -> list[URIRef]:
+    """The package's own IRI subjects — the focus-node allow-list handed to
+    pyshacl so it validates only resources the package authored.
+
+    Every IRI subject of ``local_graph`` (the package's own TTL, post
+    script:// expansion) is a candidate. When ``local_namespaces`` is known we
+    keep only subjects inside a declared matrix namespace; this drops the
+    handful of cross-vocabulary subjects (e.g. an ``rdfs:`` term the package
+    re-states) that aren't the author's resources. pyshacl intersects this list
+    with each shape's natural targets, so a shape only fires on an own subject —
+    never on the imported, already-validated closure.
+    """
+    out: list[URIRef] = []
+    for subject in set(local_graph.subjects()):
+        if not isinstance(subject, URIRef):
+            continue
+        if local_namespaces is not None and not _focus_in_local_namespace(
+            str(subject), local_namespaces
+        ):
+            continue
+        out.append(subject)
+    return out
 
 
 def _merge_cli_quality_shapes(graph: Graph) -> None:
