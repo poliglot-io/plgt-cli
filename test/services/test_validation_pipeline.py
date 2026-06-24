@@ -830,10 +830,12 @@ class TestVariablesAndSecrets:
 
 
 class TestCustomIriNodeTarget:
-    """A shape may use a custom SHACL target type that selects every
-    IRI-identified node in the data graph. pyshacl does not recognize this
-    custom target and raises ShapeLoadError on load; the pipeline expands it
-    into an equivalent SHACL-AF sh:SPARQLTarget so the shape loads and runs.
+    """A shape may use a custom SHACL target type (``plgt:IRINodeTarget``) that
+    selects every IRI-identified node in the data graph. Standard SHACL engines
+    (pyshacl) do not recognize the custom target and raise ShapeLoadError on
+    load; the pipeline STRIPS those shapes from the graph pyshacl sees and
+    evaluates them NATIVELY in Python — counting each named IRI node's values
+    for the constrained path and warning when below sh:minCount.
     """
 
     # Self-contained SHACL using the custom IRI-node target. The shape demands
@@ -862,8 +864,8 @@ class TestCustomIriNodeTarget:
     )
 
     def test_custom_target_loads_without_shapeload_error(self) -> None:
-        """The shape graph loads and validates: no ShapeLoadError surfaces as
-        a PLGT_E0500 SHACL-could-not-run diagnostic.
+        """The custom target is stripped before pyshacl loads the graph, so no
+        ShapeLoadError surfaces as a PLGT_E0500 SHACL-could-not-run diagnostic.
         """
         import rdflib
 
@@ -883,14 +885,14 @@ class TestCustomIriNodeTarget:
             if d.code == "PLGT_E0500" and "could not run" in d.message
         ]
         assert not run_failures, (
-            "custom IRI-node target should load cleanly, but SHACL failed: "
-            f"{[d.message for d in run_failures]}"
+            "custom IRI-node target should be stripped and never reach pyshacl, "
+            f"but SHACL failed: {[d.message for d in run_failures]}"
         )
 
-    def test_custom_target_selects_iri_nodes(self) -> None:
-        """The expanded target actually applies: the unlabeled IRI node is
-        selected as a focus node and produces the expected warning, while the
-        labeled node does not.
+    def test_native_eval_selects_iri_nodes(self) -> None:
+        """The native pass applies the constraint: the unlabeled IRI node is
+        selected as a focus node and produces the expected warning carrying the
+        shape's sh:message, while the labeled node does not.
         """
         import rdflib
 
@@ -911,3 +913,93 @@ class TestCustomIriNodeTarget:
         assert "https://example.com/test#Documented" not in subjects, (
             "the labeled IRI node satisfies the shape and must not warn"
         )
+        # The native finding carries the shape's own sh:message verbatim.
+        undocumented = [
+            d for d in warnings if d.subject == "https://example.com/test#Undocumented"
+        ]
+        assert any(
+            "named node should carry an rdfs:label" in d.message for d in undocumented
+        ), (
+            f"native finding should carry the shape message: {[d.message for d in undocumented]}"
+        )
+
+    def test_native_eval_is_scoped_to_local_namespaces(self) -> None:
+        """The native pass walks only the package's own resources: a node in a
+        dependency namespace that is ALSO missing a label is NOT reported when
+        ``local_namespaces`` scopes the run to the package's namespace.
+
+        This proves the evaluation does not validate the (already-published)
+        dependency closure — it emits findings only for own-namespace IRIs.
+        """
+        import rdflib
+
+        from plgt.services.diagnostics import DiagnosticBag
+
+        # ex: is the package's own namespace; dep: simulates a dependency
+        # resource that is unlabeled but NOT the author's to fix.
+        fixture = self._FIXTURE + (
+            "@prefix dep: <https://dependency.example/os#> .\n"
+            "dep:UnlabeledDepResource a ex:Thing .\n"
+        )
+        graph = rdflib.Graph()
+        graph.parse(data=fixture, format="turtle")
+        bag = DiagnosticBag()
+
+        _run_shacl_validation(
+            graph,
+            project_dir=None,  # type: ignore[arg-type]
+            bag=bag,
+            local_namespaces={"https://example.com/test#"},
+        )
+
+        warnings = [d for d in bag.diagnostics if d.code == "PLGT_W0500"]
+        subjects = {d.subject for d in warnings}
+        assert "https://example.com/test#Undocumented" in subjects, (
+            "own-namespace unlabeled node should still be warned"
+        )
+        assert "https://dependency.example/os#UnlabeledDepResource" not in subjects, (
+            "a dependency-namespace node must NOT be reported when scoped to "
+            f"the package's own namespaces; got {subjects}"
+        )
+
+    def test_custom_target_stripped_from_pyshacl_graph(self) -> None:
+        """``_extract_and_strip_iri_node_shapes`` removes the IRINodeTarget
+        NodeShape (and its property/target closure) from the graph, returning
+        the extracted constraints — so a standard SHACL engine never sees the
+        opaque custom target.
+        """
+        import rdflib
+
+        from plgt.services.validation_pipeline import (
+            PLGT_IRI_NODE_TARGET,
+            RDF_TYPE,
+            _extract_and_strip_iri_node_shapes,
+        )
+
+        graph = rdflib.Graph()
+        graph.parse(data=self._FIXTURE, format="turtle")
+
+        constraints = _extract_and_strip_iri_node_shapes(graph)
+
+        assert len(constraints) == 1, f"expected one constraint, got {constraints}"
+        (c,) = constraints
+        assert str(c.path) == "http://www.w3.org/2000/01/rdf-schema#label"
+        assert c.min_count == 1
+        assert str(c.severity) == "http://www.w3.org/ns/shacl#Warning"
+        assert c.message == "named node should carry an rdfs:label"
+
+        # The custom-target triple and the NodeShape are gone from the graph.
+        remaining_targets = list(graph.subjects(RDF_TYPE, PLGT_IRI_NODE_TARGET))
+        assert not remaining_targets, (
+            "the plgt:IRINodeTarget triple must be stripped from the graph"
+        )
+        shape = rdflib.URIRef("https://example.com/test#LabeledNodeShape")
+        assert not list(graph.predicate_objects(shape)), (
+            "the IRINodeTarget NodeShape's triples must be stripped"
+        )
+        # The unrelated data triples survive the strip.
+        assert (
+            rdflib.URIRef("https://example.com/test#Documented"),
+            rdflib.URIRef("http://www.w3.org/2000/01/rdf-schema#label"),
+            rdflib.Literal("documented"),
+        ) in graph
