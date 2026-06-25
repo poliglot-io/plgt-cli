@@ -100,6 +100,19 @@ PLGT_SCRT_DESCRIPTION = URIRef("https://poliglot.io/os/spec/secrets#description"
 PLGT_IRI_NODE_TARGET = URIRef("https://poliglot.io/os/spec#IRINodeTarget")
 
 SH_NS = rdflib.Namespace("http://www.w3.org/ns/shacl#")
+RDFS_NS = rdflib.RDFS
+
+# RDFS schema predicates that drive type entailment. Scoped pre-inference
+# (``_materialize_own_inference``) materializes the RDFS closure over only the
+# package's own subjects plus these schema axioms — not the full imported
+# instance closure — because only own subjects are validated, and their
+# inferred TYPES are the only inference output a focus-scoped SHACL run needs.
+_RDFS_SCHEMA_PREDICATES = (
+    RDFS_NS.domain,
+    RDFS_NS.range,
+    RDFS_NS.subClassOf,
+    RDFS_NS.subPropertyOf,
+)
 
 
 @dataclass
@@ -1064,30 +1077,62 @@ def _run_shacl_validation(
             subject_origin=subject_origin,
         )
 
-        # pyshacl over the standard shapes, with RDFS inference materialized so
-        # the type hierarchy matches the runtime. The data graph is the full
-        # assembled graph (so inferred types and cross-matrix references
-        # resolve); the FOCUS is restricted to the package's own IRI subjects
-        # via ``focus_nodes``. pyshacl computes each shape's natural targets
-        # over the inferred data graph, then intersects with the focus list —
-        # so a quality shape that targets a broad class (e.g. rdfs:Resource)
-        # does NOT fan out across the imported closure (the cost #29 traded
-        # correctness to avoid), while a constraint on an own subject that
-        # references an imported, inferred-typed resource still runs.
+        # pyshacl over the standard shapes. The FOCUS is restricted to the
+        # package's own IRI subjects via ``focus_nodes``; imported subjects'
+        # own shapes were already checked when their package published, so they
+        # are not re-evaluated.
         #
-        # The legacy-caller path (no scoping graph) passes the data graph as
-        # its own shapes source and applies no focus restriction.
-        focus_nodes = (
-            _own_focus_nodes(local_graph, local_namespaces) if scoped else None
-        )
-        conforms, report_graph, _ = pyshacl.validate(
-            data_graph=graph,
-            shacl_graph=graph if scoped else None,
-            inference="rdfs",
-            advanced=True,
-            inplace=False,
-            focus_nodes=focus_nodes,
-        )
+        # RDFS inference still has to be materialised so a shape that fires only
+        # because of an INFERRED own-subject type fires here too (no
+        # build-vs-runtime drift). But running pyshacl with ``inference="rdfs"``
+        # makes it expand the RDFS closure over the WHOLE assembled graph (the
+        # full imported instance data) on every call — profiling shows that
+        # closure is the dominant cost of the whole pipeline. Since only own
+        # subjects are validated, we instead materialise the closure ONCE over a
+        # scoped graph (own subjects + the schema axioms that entail their
+        # types) and merge the resulting own-subject TYPE triples back into the
+        # data graph, then hand pyshacl ``inference="none"``. The validation
+        # result is identical — the same own-subject types are present — but the
+        # owlrl closure no longer fans out across the imported closure. This
+        # mirrors the runtime, which materialises each resource's types
+        # incrementally rather than inferring the whole graph.
+        #
+        # On top of that we prune the shapes graph to only the shapes whose
+        # target could possibly hit an own subject (relevance pruning, like the
+        # runtime's target-class index): a shape is kept when its
+        # ``sh:targetClass`` is in the own subjects' inferred type closure, its
+        # ``sh:targetNode`` is an own subject, or its
+        # ``sh:targetSubjectsOf``/``sh:targetObjectsOf`` predicate appears on an
+        # own subject. This drops the bulk of the ~system shapes (whose target
+        # classes no own subject instantiates) so pyshacl never compiles or
+        # SPARQL-evaluates them. Conservative: a shape is kept whenever
+        # relevance is uncertain.
+        #
+        # The legacy-caller path (no scoping graph) keeps the original
+        # ``inference="rdfs"`` whole-graph behaviour with no focus restriction.
+        if scoped:
+            focus_nodes = _own_focus_nodes(local_graph, local_namespaces)
+            own_type_closure = _materialize_own_inference(graph, focus_nodes)
+            shapes_graph = _prune_irrelevant_shapes(
+                graph, focus_nodes, own_type_closure
+            )
+            conforms, report_graph, _ = pyshacl.validate(
+                data_graph=graph,
+                shacl_graph=shapes_graph,
+                inference="none",
+                advanced=True,
+                inplace=False,
+                focus_nodes=focus_nodes,
+            )
+        else:
+            conforms, report_graph, _ = pyshacl.validate(
+                data_graph=graph,
+                shacl_graph=None,
+                inference="rdfs",
+                advanced=True,
+                inplace=False,
+                focus_nodes=None,
+            )
     except Exception as e:  # noqa: BLE001 — pyshacl + its rdflib internals raise many shapes
         bag.error(
             "PLGT_E0500",
@@ -1208,6 +1253,141 @@ def _own_focus_nodes(
             continue
         out.append(subject)
     return out
+
+
+def _materialize_own_inference(graph: Graph, focus_nodes: list[URIRef]) -> set[URIRef]:
+    """Materialise the RDFS type closure for the package's OWN subjects in
+    place on ``graph`` and return their inferred type closure (own types plus
+    every superclass).
+
+    Why scoped: ``graph`` is the full assembled graph (own package + every
+    imported matrix's instance data + the system ontology). A focus-scoped
+    SHACL run only validates the own subjects, so the only inference output it
+    can ever consume is the set of TYPES entailed for those own subjects. The
+    expensive part of running pyshacl with ``inference="rdfs"`` is that owlrl
+    expands the RDFS closure over the WHOLE graph — including the thousands of
+    imported instance triples that no shape will ever be evaluated against.
+
+    Instead we build a small scratch graph holding (a) every RDFS schema axiom
+    (``rdfs:domain`` / ``rdfs:range`` / ``rdfs:subClassOf`` /
+    ``rdfs:subPropertyOf``) from the assembled graph and (b) every triple in
+    which an own subject participates (as subject or object), run the RDFS
+    closure over just that, and copy the resulting own-subject ``rdf:type``
+    triples back into ``graph``. Domain/range/subclass entailment for an own
+    subject depends only on that subject's own triples and the schema axioms,
+    so the materialised own-subject types are identical to a full-graph
+    closure — but the closure runs over hundreds of triples instead of tens of
+    thousands. The full imported instance data stays in ``graph`` un-inferred
+    as plain validation context (its explicit type triples already resolve
+    cross-matrix references).
+
+    The returned type closure is the relevance key for shape pruning.
+    """
+    import owlrl
+
+    focus_set = set(focus_nodes)
+    scratch = Graph()
+    for predicate in _RDFS_SCHEMA_PREDICATES:
+        for s, _p, o in graph.triples((None, predicate, None)):
+            scratch.add((s, predicate, o))
+    for node in focus_set:
+        for p, o in graph.predicate_objects(node):
+            scratch.add((node, p, o))
+        for s, p in graph.subject_predicates(node):
+            scratch.add((s, p, node))
+
+    owlrl.DeductiveClosure(
+        owlrl.RDFS_Semantics, axiomatic_triples=False, datatype_axioms=False
+    ).expand(scratch)
+
+    own_types: set[URIRef] = set()
+    for node in focus_set:
+        for type_uri in scratch.objects(node, RDF_TYPE):
+            if isinstance(type_uri, URIRef):
+                own_types.add(type_uri)
+            graph.add((node, RDF_TYPE, type_uri))
+
+    # Type closure = own types + every superclass (a sh:targetClass matches an
+    # own subject when the targeted class is a superclass of one of its types).
+    closure: set[URIRef] = set(own_types)
+    frontier: set[URIRef] = set(own_types)
+    while frontier:
+        nxt: set[URIRef] = set()
+        for cls in frontier:
+            for sup in graph.objects(cls, RDFS_NS.subClassOf):
+                if isinstance(sup, URIRef) and sup not in closure:
+                    closure.add(sup)
+                    nxt.add(sup)
+        frontier = nxt
+    return closure
+
+
+def _prune_irrelevant_shapes(
+    graph: Graph, focus_nodes: list[URIRef], own_type_closure: set[URIRef]
+) -> Graph:
+    """Return a copy of ``graph`` with every shape that cannot possibly produce
+    a finding on an own subject removed — relevance pruning that mirrors the
+    runtime's target-class index.
+
+    A shape carrying an explicit target is RELEVANT (kept) when:
+
+    * its ``sh:targetClass`` is in ``own_type_closure`` (some own subject is an
+      instance, directly or via a subclass / inferred type), OR
+    * its ``sh:targetNode`` is an own subject, OR
+    * its ``sh:targetSubjectsOf`` / ``sh:targetObjectsOf`` predicate appears on
+      an own subject.
+
+    Shapes with NO explicit target are never stripped — they are property
+    shapes referenced by a (possibly relevant) node shape, or advanced targets
+    we don't model, and dropping them could change a kept shape's meaning.
+    Irrelevant top-level target shapes have their triples plus their
+    ``sh:property`` / ``sh:target`` blank-node closures removed, so pyshacl
+    never compiles or SPARQL-evaluates them. Conservative throughout: anything
+    whose relevance is uncertain is kept.
+    """
+    own_uris = {str(node) for node in focus_nodes}
+    own_predicates: set[URIRef] = set()
+    for node in focus_nodes:
+        for predicate in graph.predicates(node, None):
+            if isinstance(predicate, URIRef):
+                own_predicates.add(predicate)
+
+    all_shapes = set(graph.subjects(RDF_TYPE, SH_NS.NodeShape)) | set(
+        graph.subjects(RDF_TYPE, SH_NS.PropertyShape)
+    )
+
+    drop: set = set()
+    for shape in all_shapes:
+        target_classes = set(graph.objects(shape, SH_NS.targetClass))
+        target_nodes = set(graph.objects(shape, SH_NS.targetNode))
+        target_subjects_of = set(graph.objects(shape, SH_NS.targetSubjectsOf))
+        target_objects_of = set(graph.objects(shape, SH_NS.targetObjectsOf))
+        has_explicit_target = bool(
+            target_classes or target_nodes or target_subjects_of or target_objects_of
+        )
+        if not has_explicit_target:
+            continue  # referenced / advanced shape — never strip
+        relevant = (
+            bool(target_classes & own_type_closure)
+            or any(str(n) in own_uris for n in target_nodes)
+            or bool(target_subjects_of & own_predicates)
+            or bool(target_objects_of & own_predicates)
+        )
+        if not relevant:
+            drop.add(shape)
+
+    pruned = Graph()
+    for prefix, namespace in graph.namespaces():
+        pruned.bind(prefix, namespace, replace=False)
+    for triple in graph:
+        pruned.add(triple)
+    for shape in drop:
+        for prop in list(graph.objects(shape, SH_NS.property)):
+            _remove_node_closure(pruned, prop)
+        for target in list(graph.objects(shape, SH_NS.target)):
+            _remove_node_closure(pruned, target)
+        _remove_node_closure(pruned, shape)
+    return pruned
 
 
 def _merge_cli_quality_shapes(graph: Graph) -> None:
