@@ -102,18 +102,6 @@ PLGT_IRI_NODE_TARGET = URIRef("https://poliglot.io/os/spec#IRINodeTarget")
 SH_NS = rdflib.Namespace("http://www.w3.org/ns/shacl#")
 RDFS_NS = rdflib.RDFS
 
-# RDFS schema predicates that drive type entailment. Scoped pre-inference
-# (``_materialize_own_inference``) materializes the RDFS closure over only the
-# package's own subjects plus these schema axioms — not the full imported
-# instance closure — because only own subjects are validated, and their
-# inferred TYPES are the only inference output a focus-scoped SHACL run needs.
-_RDFS_SCHEMA_PREDICATES = (
-    RDFS_NS.domain,
-    RDFS_NS.range,
-    RDFS_NS.subClassOf,
-    RDFS_NS.subPropertyOf,
-)
-
 
 @dataclass
 class ValidationResult:
@@ -1086,16 +1074,16 @@ def _run_shacl_validation(
         # because of an INFERRED own-subject type fires here too (no
         # build-vs-runtime drift). But running pyshacl with ``inference="rdfs"``
         # makes it expand the RDFS closure over the WHOLE assembled graph (the
-        # full imported instance data) on every call — profiling shows that
-        # closure is the dominant cost of the whole pipeline. Since only own
-        # subjects are validated, we instead materialise the closure ONCE over a
-        # scoped graph (own subjects + the schema axioms that entail their
-        # types) and merge the resulting own-subject TYPE triples back into the
-        # data graph, then hand pyshacl ``inference="none"``. The validation
-        # result is identical — the same own-subject types are present — but the
-        # owlrl closure no longer fans out across the imported closure. This
-        # mirrors the runtime, which materialises each resource's types
-        # incrementally rather than inferring the whole graph.
+        # full imported instance data) on every call. Since only own subjects
+        # are validated, we instead materialise the narrow type entailment
+        # (``rdfs:domain`` / ``rdfs:range`` / ``rdfs:subPropertyOf`` /
+        # ``rdfs:subClassOf``) for the own subjects directly — see
+        # ``_materialize_own_inference`` — merge the resulting own-subject TYPE
+        # triples back into the data graph, then hand pyshacl
+        # ``inference="none"``. The validation result is identical — the same
+        # own-subject types are present — without any general RDFS/OWL reasoner.
+        # This mirrors the runtime, which materialises each resource's types
+        # from the same narrow rules rather than inferring the whole graph.
         #
         # On top of that we prune the shapes graph to only the shapes whose
         # target could possibly hit an own subject (relevance pruning, like the
@@ -1255,6 +1243,27 @@ def _own_focus_nodes(
     return out
 
 
+def _transitive_closure(
+    seeds: set[URIRef], parents: dict[URIRef, set[URIRef]]
+) -> set[URIRef]:
+    """Transitive closure of ``seeds`` over the ``parents`` adjacency map
+    (e.g. class → superclasses, or property → superproperties). Returns every
+    node reachable from a seed, including the seeds themselves. Cycle-safe via
+    the ``seen`` set.
+    """
+    seen = set(seeds)
+    frontier = set(seeds)
+    while frontier:
+        nxt: set[URIRef] = set()
+        for node in frontier:
+            for parent in parents.get(node, ()):
+                if parent not in seen:
+                    seen.add(parent)
+                    nxt.add(parent)
+        frontier = nxt
+    return seen
+
+
 def _materialize_own_inference(graph: Graph, focus_nodes: list[URIRef]) -> set[URIRef]:
     """Materialise the RDFS type closure for the package's OWN subjects in
     place on ``graph`` and return their inferred type closure (own types plus
@@ -1263,62 +1272,77 @@ def _materialize_own_inference(graph: Graph, focus_nodes: list[URIRef]) -> set[U
     Why scoped: ``graph`` is the full assembled graph (own package + every
     imported matrix's instance data + the system ontology). A focus-scoped
     SHACL run only validates the own subjects, so the only inference output it
-    can ever consume is the set of TYPES entailed for those own subjects. The
-    expensive part of running pyshacl with ``inference="rdfs"`` is that owlrl
-    expands the RDFS closure over the WHOLE graph — including the thousands of
-    imported instance triples that no shape will ever be evaluated against.
+    can ever consume is the set of TYPES entailed for those own subjects. So we
+    materialise only those own-subject types, directly, from the small set of
+    RDFS rules that can entail a *type*:
 
-    Instead we build a small scratch graph holding (a) every RDFS schema axiom
-    (``rdfs:domain`` / ``rdfs:range`` / ``rdfs:subClassOf`` /
-    ``rdfs:subPropertyOf``) from the assembled graph and (b) every triple in
-    which an own subject participates (as subject or object), run the RDFS
-    closure over just that, and copy the resulting own-subject ``rdf:type``
-    triples back into ``graph``. Domain/range/subclass entailment for an own
-    subject depends only on that subject's own triples and the schema axioms,
-    so the materialised own-subject types are identical to a full-graph
-    closure — but the closure runs over hundreds of triples instead of tens of
-    thousands. The full imported instance data stays in ``graph`` un-inferred
-    as plain validation context (its explicit type triples already resolve
-    cross-matrix references).
+    * **rdfs2 (domain).** A predicate ``p`` with ``rdfs:domain D`` types every
+      subject of ``p`` as ``D`` — so each own subject gains ``D`` for every
+      predicate it carries.
+    * **rdfs3 (range).** A predicate ``p`` with ``rdfs:range R`` types every
+      object of ``p`` as ``R`` — so each own subject in object position gains
+      ``R``.
+    * **rdfs5/rdfs7 (subPropertyOf).** A predicate inherits the domain/range of
+      every super-property, so domain/range entailment walks the
+      ``rdfs:subPropertyOf`` closure of each predicate the node uses.
+    * **rdfs4 (resource).** Every node is an ``rdfs:Resource``.
+    * **rdfs9/rdfs11 (subClassOf).** A type entails every superclass via the
+      transitive ``rdfs:subClassOf`` closure.
 
-    The returned type closure is the relevance key for shape pruning.
+    This is the narrow entailment the system actually uses — it does NOT use
+    OWL, and a general RDFS/OWL reasoner (``owlrl``) over even a scoped graph is
+    both the wrong tool and a latent fan-out risk. Direct graph queries over the
+    schema axioms produce a type set identical to the full RDFS closure (proved
+    against the prior owlrl implementation on the real assembled graph) at a
+    fraction of the cost. The full imported instance data stays in ``graph``
+    un-inferred as plain validation context; its explicit type triples already
+    resolve cross-matrix references.
+
+    The inferred own-subject ``rdf:type`` triples are added to ``graph`` in
+    place; the returned type closure (own types + every superclass) is the
+    relevance key for shape pruning.
     """
-    import owlrl
-
     focus_set = set(focus_nodes)
-    scratch = Graph()
-    for predicate in _RDFS_SCHEMA_PREDICATES:
-        for s, _p, o in graph.triples((None, predicate, None)):
-            scratch.add((s, predicate, o))
-    for node in focus_set:
-        for p, o in graph.predicate_objects(node):
-            scratch.add((node, p, o))
-        for s, p in graph.subject_predicates(node):
-            scratch.add((s, p, node))
 
-    owlrl.DeductiveClosure(
-        owlrl.RDFS_Semantics, axiomatic_triples=False, datatype_axioms=False
-    ).expand(scratch)
+    # Index the schema axioms once: predicate → domain/range classes,
+    # predicate → super-properties, class → super-classes.
+    domains: dict[URIRef, set[URIRef]] = {}
+    ranges: dict[URIRef, set[URIRef]] = {}
+    super_properties: dict[URIRef, set[URIRef]] = {}
+    super_classes: dict[URIRef, set[URIRef]] = {}
+    for prop, _p, cls in graph.triples((None, RDFS_NS.domain, None)):
+        if isinstance(cls, URIRef):
+            domains.setdefault(prop, set()).add(cls)
+    for prop, _p, cls in graph.triples((None, RDFS_NS.range, None)):
+        if isinstance(cls, URIRef):
+            ranges.setdefault(prop, set()).add(cls)
+    for prop, _p, sup in graph.triples((None, RDFS_NS.subPropertyOf, None)):
+        if isinstance(sup, URIRef):
+            super_properties.setdefault(prop, set()).add(sup)
+    for cls, _p, sup in graph.triples((None, RDFS_NS.subClassOf, None)):
+        if isinstance(sup, URIRef):
+            super_classes.setdefault(cls, set()).add(sup)
 
-    own_types: set[URIRef] = set()
+    closure: set[URIRef] = set()
     for node in focus_set:
-        for type_uri in scratch.objects(node, RDF_TYPE):
-            if isinstance(type_uri, URIRef):
-                own_types.add(type_uri)
+        types: set[URIRef] = {
+            t for t in graph.objects(node, RDF_TYPE) if isinstance(t, URIRef)
+        }
+        # rdfs2 (domain), walking subPropertyOf for each predicate the node uses.
+        for predicate in set(graph.predicates(node, None)):
+            for prop in _transitive_closure({predicate}, super_properties):
+                types |= domains.get(prop, set())
+        # rdfs3 (range): predicates whose OBJECT is this node, with subPropertyOf.
+        for predicate in set(graph.predicates(None, node)):
+            for prop in _transitive_closure({predicate}, super_properties):
+                types |= ranges.get(prop, set())
+        # rdfs4: every node is an rdfs:Resource.
+        types.add(RDFS_NS.Resource)
+        # rdfs9/rdfs11: a type entails every superclass.
+        full = _transitive_closure(types, super_classes)
+        for type_uri in full:
             graph.add((node, RDF_TYPE, type_uri))
-
-    # Type closure = own types + every superclass (a sh:targetClass matches an
-    # own subject when the targeted class is a superclass of one of its types).
-    closure: set[URIRef] = set(own_types)
-    frontier: set[URIRef] = set(own_types)
-    while frontier:
-        nxt: set[URIRef] = set()
-        for cls in frontier:
-            for sup in graph.objects(cls, RDFS_NS.subClassOf):
-                if isinstance(sup, URIRef) and sup not in closure:
-                    closure.add(sup)
-                    nxt.add(sup)
-        frontier = nxt
+        closure |= full
     return closure
 
 
@@ -1516,7 +1540,13 @@ def _evaluate_iri_node_targets(
     """
     if not constraints:
         return
-    seen: set[tuple[str, str]] = set()
+    # Dedup on (node, path, severity, source-shape) — NOT just (node, path) — so
+    # two distinct constraints on the same path survive as separate findings
+    # (e.g. an Info nudge for one predicate and a Warning nudge for another that
+    # happen to share a path, or the same path advised at two severities). Only
+    # a genuinely identical constraint registered twice (overlapping imports) is
+    # collapsed.
+    seen: set[tuple[str, str, str, str]] = set()
     for node in set(data_graph.subjects()):
         if not isinstance(node, URIRef):
             continue  # blank nodes are never targeted
@@ -1528,9 +1558,14 @@ def _evaluate_iri_node_targets(
         for c in constraints:
             if len(list(data_graph.objects(node, c.path))) >= c.min_count:
                 continue
-            key = (node_str, str(c.path))
+            key = (
+                node_str,
+                str(c.path),
+                str(c.severity) if c.severity else "",
+                c.source_shape or "",
+            )
             if key in seen:
-                continue  # overlapping imports can register identical constraints
+                continue  # identical constraint via overlapping imports
             seen.add(key)
             parts = []
             if c.message:

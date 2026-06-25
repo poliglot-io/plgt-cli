@@ -964,6 +964,76 @@ class TestCustomIriNodeTarget:
             f"the package's own namespaces; got {subjects}"
         )
 
+    def test_native_eval_distinct_severities_on_same_node_both_survive(self) -> None:
+        """Two distinct advisory constraints on the SAME node — an Info nudge for
+        a missing ``rdfs:comment`` and a Warning nudge for a missing
+        ``rdfs:label`` — must BOTH be emitted. Dedup keys on
+        (node, path, severity, source-shape), so distinct findings on one node
+        are never collapsed, while a genuinely identical constraint registered
+        twice (overlapping imports) is collapsed to one.
+        """
+        import rdflib
+
+        from plgt.services.diagnostics import DiagnosticBag
+        from plgt.services.validation_pipeline import (
+            _evaluate_iri_node_targets,
+            _IRINodeConstraint,
+        )
+
+        rdfs = rdflib.RDFS
+        sh = rdflib.Namespace("http://www.w3.org/ns/shacl#")
+        ex_ns = rdflib.Namespace("https://example.com/test#")
+
+        graph = rdflib.Graph()
+        graph.parse(
+            data=(
+                "@prefix ex:   <https://example.com/test#> .\n"
+                # A bare IRI node missing BOTH a label and a comment.
+                "ex:Bare a ex:Thing .\n"
+            ),
+            format="turtle",
+        )
+
+        label_warn = _IRINodeConstraint(
+            path=rdfs.label,
+            min_count=1,
+            severity=sh.Warning,
+            message="named node should carry an rdfs:label",
+            source_shape="https://example.com/test#LabelShape",
+        )
+        comment_info = _IRINodeConstraint(
+            path=rdfs.comment,
+            min_count=1,
+            severity=sh.Info,
+            message="named node should carry an rdfs:comment",
+            source_shape="https://example.com/test#CommentShape",
+        )
+        # The label constraint appears twice (e.g. via two overlapping imports
+        # of the same shape) — the duplicate must collapse to a single finding.
+        constraints = [label_warn, comment_info, label_warn]
+
+        bag = DiagnosticBag()
+        _evaluate_iri_node_targets(
+            graph, constraints, bag, local_namespaces={str(ex_ns)}
+        )
+
+        bare = "https://example.com/test#Bare"
+        warning = [
+            d for d in bag.diagnostics if d.code == "PLGT_W0500" and d.subject == bare
+        ]
+        info = [
+            d for d in bag.diagnostics if d.code == "PLGT_I0500" and d.subject == bare
+        ]
+        assert len(warning) == 1, (
+            "the missing-label Warning must survive exactly once (duplicate "
+            f"identical constraint collapses): {[d.message for d in warning]}"
+        )
+        assert len(info) == 1, (
+            f"the missing-comment Info must survive: {[d.message for d in info]}"
+        )
+        assert "rdfs:label" in warning[0].message
+        assert "rdfs:comment" in info[0].message
+
     def test_custom_target_stripped_from_pyshacl_graph(self) -> None:
         """``_extract_and_strip_iri_node_shapes`` removes the IRINodeTarget
         NodeShape (and its property/target closure) from the graph, returning
@@ -1486,6 +1556,110 @@ class TestShaclInferenceAndFocusScoping:
         assert sys_ns.LivingThing in closure
         # The dependency subject was NOT typed by the scoped pass.
         assert sys_ns.Animal not in set(graph.objects(dep_ns.Cat, rdflib.RDF.type))
+
+    def test_materialize_own_inference_range_entailment(self) -> None:
+        """An own subject in the OBJECT position of a predicate with an
+        ``rdfs:range`` gains that range class as an inferred type (rdfs3), and
+        the type's superclasses join the closure. This is the entailment path a
+        shape targeting the range class relies on.
+        """
+        import rdflib
+
+        from plgt.services.validation_pipeline import _materialize_own_inference
+
+        sys_ns = rdflib.Namespace("https://poliglot.io/os/spec#")
+        ex_ns = rdflib.Namespace("https://example.com/test#")
+
+        graph = rdflib.Graph()
+        graph.parse(
+            data=(
+                "@prefix sys:  <https://poliglot.io/os/spec#> .\n"
+                "@prefix ex:   <https://example.com/test#> .\n"
+                "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                "sys:Organ a rdfs:Class .\n"
+                "sys:BodyPart a rdfs:Class .\n"
+                "sys:Organ rdfs:subClassOf sys:BodyPart .\n"
+                "sys:hasOrgan rdfs:range sys:Organ .\n"
+                # ex:Heart is the OBJECT of hasOrgan → inferred sys:Organ via range.
+                "ex:Dog sys:hasOrgan ex:Heart .\n"
+            ),
+            format="turtle",
+        )
+
+        closure = _materialize_own_inference(graph, [ex_ns.Heart])
+
+        assert sys_ns.Organ in set(graph.objects(ex_ns.Heart, rdflib.RDF.type)), (
+            "the object of a predicate with an rdfs:range must gain the range type"
+        )
+        assert sys_ns.Organ in closure
+        assert sys_ns.BodyPart in closure, (
+            "the range type's superclass must be in the closure"
+        )
+
+    def test_materialize_own_inference_subproperty_inherits_domain(self) -> None:
+        """A predicate inherits its super-property's ``rdfs:domain`` via the
+        ``rdfs:subPropertyOf`` closure (rdfs5/rdfs7), so a subject using the
+        sub-property gains the super-property's domain type.
+        """
+        import rdflib
+
+        from plgt.services.validation_pipeline import _materialize_own_inference
+
+        sys_ns = rdflib.Namespace("https://poliglot.io/os/spec#")
+        ex_ns = rdflib.Namespace("https://example.com/test#")
+
+        graph = rdflib.Graph()
+        graph.parse(
+            data=(
+                "@prefix sys:  <https://poliglot.io/os/spec#> .\n"
+                "@prefix ex:   <https://example.com/test#> .\n"
+                "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                "sys:Animal a rdfs:Class .\n"
+                "sys:relatesTo rdfs:domain sys:Animal .\n"
+                # eats is a sub-property of relatesTo; it has no domain of its
+                # own, so its subject must inherit relatesTo's domain (Animal).
+                "sys:eats rdfs:subPropertyOf sys:relatesTo .\n"
+                "ex:Dog sys:eats ex:Bone .\n"
+            ),
+            format="turtle",
+        )
+
+        closure = _materialize_own_inference(graph, [ex_ns.Dog])
+
+        assert sys_ns.Animal in set(graph.objects(ex_ns.Dog, rdflib.RDF.type)), (
+            "a sub-property's subject must inherit the super-property's domain type"
+        )
+        assert sys_ns.Animal in closure
+
+    def test_materialize_own_inference_types_every_node_as_resource(self) -> None:
+        """Every own focus node is typed ``rdfs:Resource`` (rdfs4), matching the
+        prior full-RDFS closure — so a shape targeting ``rdfs:Resource`` still
+        matches every own subject.
+        """
+        import rdflib
+
+        from plgt.services.validation_pipeline import _materialize_own_inference
+
+        ex_ns = rdflib.Namespace("https://example.com/test#")
+        rdfs_resource = rdflib.RDFS.Resource
+
+        graph = rdflib.Graph()
+        graph.parse(
+            data=(
+                "@prefix ex:   <https://example.com/test#> .\n"
+                "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                # A bare subject with no schema-derivable type at all.
+                'ex:Thing rdfs:label "thing" .\n'
+            ),
+            format="turtle",
+        )
+
+        closure = _materialize_own_inference(graph, [ex_ns.Thing])
+
+        assert rdfs_resource in set(graph.objects(ex_ns.Thing, rdflib.RDF.type)), (
+            "rdfs4: every node must be typed rdfs:Resource"
+        )
+        assert rdfs_resource in closure
 
     def test_prune_keeps_untargeted_and_relevant_shapes(self) -> None:
         """``_prune_irrelevant_shapes`` drops only top-level target shapes that
