@@ -4,7 +4,7 @@ Tests cover SecretsClient functionality including listing, getting,
 and setting secret values with E2E encryption.
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 import requests
@@ -147,83 +147,155 @@ class TestGetSecret:
 class TestGetSecretValue:
     """Test secret value retrieval with E2E decryption."""
 
-    @patch("plgt.clients.secrets_client.generate_keypair")
-    @patch("plgt.clients.secrets_client.public_key_to_base64")
-    @patch("plgt.clients.secrets_client.parse_encrypted_response")
-    @patch("plgt.clients.secrets_client.decrypt_secret_value")
-    def test_get_value_decrypts_response(
-        self,
-        mock_decrypt,
-        mock_parse,
-        mock_to_base64,
-        mock_generate,
-    ):
-        """Test get_secret_value performs E2E decryption."""
-        mock_private_key = Mock()
-        mock_public_key = Mock()
-        mock_generate.return_value = (mock_private_key, mock_public_key)
-        mock_to_base64.return_value = "base64-public-key"
+    def _mock_handshake_session(self, server_public_key: bytes):
+        """Mock a session whose POST /pubkey returns ``server_public_key``."""
+        import base64 as _b64
 
         mock_session = Mock()
-        mock_response = Mock()
-        mock_response.json.return_value = {
+        mock_pubkey_response = Mock()
+        mock_pubkey_response.json.return_value = {
             "data": {
-                "encryptedValue": "encrypted-data",
-                "nonce": "nonce-data",
-                "serverPublicKey": "server-key",
-                "algorithm": "X25519_XCHACHA20_POLY1305",
+                "serverPublicKey": _b64.b64encode(server_public_key).decode("ascii"),
+                "keyId": "test-key-id",
+                "algorithm": "X25519-XChaCha20-Poly1305",
+                "expiresAt": "2099-01-01T00:00:00Z",
             }
         }
-        mock_session.get.return_value = mock_response
+        mock_session.post.return_value = mock_pubkey_response
+        return mock_session
 
-        mock_encrypted = Mock()
-        mock_parse.return_value = mock_encrypted
-        mock_decrypt.return_value = "decrypted-secret-value"
+    def test_get_value_round_trips(self):
+        """A server-encrypted envelope decrypts back to the plaintext value.
+
+        Exercises the real handshake: POST /pubkey, client keypair, GET /value
+        with query params, then ECDH decrypt against the server pubkey.
+        """
+        import base64 as _b64
+
+        from nacl.public import PrivateKey
+
+        captured = {}
+
+        # Fix a single server keypair: the pubkey returned by POST /pubkey must
+        # be the one whose private half encrypts the value the client decrypts.
+        server_private = PrivateKey.generate()
+        server_public_key = bytes(server_private.public_key)
+        mock_session = self._mock_handshake_session(server_public_key)
+
+        def fake_get_fixed_server(url, params=None, **kwargs):
+            from nacl.secret import Aead
+            from nacl.utils import random
+
+            from plgt.core.crypto import derive_symmetric_key
+
+            client_public_key = _b64.b64decode(params["clientPublicKey"])
+            captured["url"] = url
+            captured["params"] = params
+            symmetric_key = derive_symmetric_key(server_private, client_public_key)
+            aead = Aead(symmetric_key)
+            nonce = random(Aead.NONCE_SIZE)
+            ciphertext = aead.encrypt("sk-test-api-key-12345".encode(), nonce=nonce)[
+                Aead.NONCE_SIZE :
+            ]
+            resp = Mock()
+            resp.json.return_value = {
+                "data": {
+                    "encryptedValue": _b64.b64encode(ciphertext).decode("ascii"),
+                    "nonce": _b64.b64encode(nonce).decode("ascii"),
+                    "algorithm": "X25519-XChaCha20-Poly1305",
+                }
+            }
+            return resp
+
+        mock_session.get.side_effect = fake_get_fixed_server
 
         client = SecretsClient(mock_session)
         result = client.get_secret_value("test-workspace", "mymatrix:OpenAIAPIKey")
 
-        assert result == "decrypted-secret-value"
+        assert result == "sk-test-api-key-12345"
 
-        # Verify ephemeral public key was sent in header
-        call_args = mock_session.get.call_args
-        assert call_args[1]["headers"]["X-Ephemeral-Pubkey"] == "base64-public-key"
+        # Handshake: POST /pubkey first.
+        mock_session.post.assert_called_once_with(
+            "/api/v1/secrets/test-workspace/pubkey",
+        )
 
-        # Verify decryption was called
-        mock_decrypt.assert_called_once_with(mock_encrypted, mock_private_key)
+        # The handshake is carried as query params, never headers.
+        assert (
+            captured["url"]
+            == "/api/v1/secrets/test-workspace/mymatrix:OpenAIAPIKey/value"
+        )
+        assert captured["params"]["keyId"] == "test-key-id"
+        assert captured["params"]["scope"] == "workspace"
+        assert "clientPublicKey" in captured["params"]
+        assert "scopeEntityId" not in captured["params"]
+        assert "headers" not in mock_session.get.call_args[1]
 
-    @patch("plgt.clients.secrets_client.generate_keypair")
-    @patch("plgt.clients.secrets_client.public_key_to_base64")
-    @patch("plgt.clients.secrets_client.parse_encrypted_response")
-    @patch("plgt.clients.secrets_client.decrypt_secret_value")
-    def test_get_value_decryption_error(
-        self,
-        mock_decrypt,
-        mock_parse,
-        mock_to_base64,
-        mock_generate,
-    ):
-        """Test get_secret_value raises ServiceError on decryption failure."""
-        mock_private_key = Mock()
-        mock_public_key = Mock()
-        mock_generate.return_value = (mock_private_key, mock_public_key)
-        mock_to_base64.return_value = "base64-public-key"
+    def test_get_value_principal_scope_sends_entity_id(self):
+        """A principal-scoped read carries scope='principal' + scopeEntityId."""
+        from nacl.public import PrivateKey
 
-        mock_session = Mock()
-        mock_response = Mock()
-        mock_response.json.return_value = {"data": {}}
-        mock_session.get.return_value = mock_response
+        server_public_key = bytes(PrivateKey.generate().public_key)
+        mock_session = self._mock_handshake_session(server_public_key)
 
-        mock_parse.side_effect = ValueError("Invalid response")
+        captured = {}
+
+        def fake_get(url, params=None, **kwargs):
+            captured["params"] = params
+            # Returning a malformed envelope is fine; we only assert the params,
+            # and decryption failure surfaces as ServiceError after capture.
+            resp = Mock()
+            resp.json.return_value = {"data": {}}
+            return resp
+
+        mock_session.get.side_effect = fake_get
+
+        client = SecretsClient(mock_session)
+        with pytest.raises(ServiceError):
+            client.get_secret_value(
+                "test-workspace",
+                "mymatrix:OpenAIAPIKey",
+                scope="principal",
+                scope_entity_id="11111111-2222-3333-4444-555555555555",
+            )
+
+        assert captured["params"]["scope"] == "principal"
+        assert (
+            captured["params"]["scopeEntityId"]
+            == "11111111-2222-3333-4444-555555555555"
+        )
+
+    def test_get_value_decryption_error(self):
+        """get_secret_value raises ServiceError on a malformed envelope."""
+        from nacl.public import PrivateKey
+
+        server_public_key = bytes(PrivateKey.generate().public_key)
+        mock_session = self._mock_handshake_session(server_public_key)
+
+        bad_response = Mock()
+        bad_response.json.return_value = {"data": {}}  # missing encryptedValue
+        mock_session.get.return_value = bad_response
 
         client = SecretsClient(mock_session)
 
         with pytest.raises(ServiceError, match="Failed to decrypt secret value"):
             client.get_secret_value("test-workspace", "mymatrix:OpenAIAPIKey")
 
-    def test_get_value_http_error(self):
-        """Test get_secret_value raises ServiceError on HTTP error."""
+    def test_get_value_pubkey_http_error(self):
+        """get_secret_value raises ServiceError when the pubkey POST fails."""
         mock_session = Mock()
+        mock_session.post.side_effect = requests.RequestException("Server error")
+
+        client = SecretsClient(mock_session)
+
+        with pytest.raises(ServiceError, match="Failed to fetch secret value"):
+            client.get_secret_value("test-workspace", "mymatrix:OpenAIAPIKey")
+
+    def test_get_value_http_error(self):
+        """get_secret_value raises ServiceError when the value GET fails."""
+        from nacl.public import PrivateKey
+
+        server_public_key = bytes(PrivateKey.generate().public_key)
+        mock_session = self._mock_handshake_session(server_public_key)
         mock_session.get.side_effect = requests.RequestException("Server error")
 
         client = SecretsClient(mock_session)
