@@ -3,7 +3,6 @@
 Tests cover E2E encryption utilities for secret management including:
 - Key generation
 - Base64 encoding
-- Response parsing
 - Decryption
 """
 
@@ -18,7 +17,6 @@ from plgt.core.crypto import (
     derive_symmetric_key,
     encrypt_secret_value,
     generate_keypair,
-    parse_encrypted_response,
     public_key_to_base64,
 )
 
@@ -65,61 +63,6 @@ class TestPublicKeyToBase64:
         decoded = base64.b64decode(result)
 
         assert len(decoded) == 32
-
-
-class TestParseEncryptedResponse:
-    """Test encrypted response parsing."""
-
-    def test_parses_valid_response(self):
-        """Test parsing a valid encrypted response."""
-        data = {
-            "encryptedValue": base64.b64encode(b"encrypted-data").decode(),
-            "nonce": base64.b64encode(b"nonce-24-bytes-long!!!!").decode(),
-            "serverPublicKey": base64.b64encode(b"x" * 32).decode(),
-            "algorithm": "X25519-XChaCha20-Poly1305",
-        }
-
-        result = parse_encrypted_response(data)
-
-        assert isinstance(result, EncryptedSecretResponse)
-        assert result.encrypted_value == b"encrypted-data"
-        assert result.nonce == b"nonce-24-bytes-long!!!!"
-        assert result.server_public_key == b"x" * 32
-        assert result.algorithm == "X25519-XChaCha20-Poly1305"
-
-    def test_raises_on_missing_encrypted_value(self):
-        """Test that missing encryptedValue raises ValueError."""
-        data = {
-            "nonce": base64.b64encode(b"nonce").decode(),
-            "serverPublicKey": base64.b64encode(b"x" * 32).decode(),
-            "algorithm": "X25519-XChaCha20-Poly1305",
-        }
-
-        with pytest.raises(ValueError, match="Missing required field"):
-            parse_encrypted_response(data)
-
-    def test_raises_on_missing_nonce(self):
-        """Test that missing nonce raises ValueError."""
-        data = {
-            "encryptedValue": base64.b64encode(b"encrypted").decode(),
-            "serverPublicKey": base64.b64encode(b"x" * 32).decode(),
-            "algorithm": "X25519-XChaCha20-Poly1305",
-        }
-
-        with pytest.raises(ValueError, match="Missing required field"):
-            parse_encrypted_response(data)
-
-    def test_raises_on_invalid_base64(self):
-        """Test that invalid base64 raises ValueError."""
-        data = {
-            "encryptedValue": "not-valid-base64!!!",
-            "nonce": base64.b64encode(b"nonce").decode(),
-            "serverPublicKey": base64.b64encode(b"x" * 32).decode(),
-            "algorithm": "X25519-XChaCha20-Poly1305",
-        }
-
-        with pytest.raises(ValueError, match="Failed to parse"):
-            parse_encrypted_response(data)
 
 
 class TestDecryptSecretValue:

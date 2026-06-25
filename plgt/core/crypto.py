@@ -4,7 +4,8 @@ This module provides X25519 key exchange and XChaCha20-Poly1305 decryption
 for securely retrieving secret values from the Platform API.
 
 The Platform encrypts secret values using:
-1. Ephemeral X25519 keypair (client sends public key in header)
+1. Ephemeral X25519 keypair (client sends its public key + the server keyId
+   as query params, having first fetched the server pubkey via POST /pubkey)
 2. ECDH shared secret derivation
 3. XChaCha20-Poly1305 authenticated encryption
 
@@ -56,39 +57,6 @@ def public_key_to_base64(public_key: PublicKey) -> str:
         Base64-encoded public key string.
     """
     return base64.b64encode(bytes(public_key)).decode("ascii")
-
-
-def parse_encrypted_response(data: dict) -> EncryptedSecretResponse:
-    """Parse encrypted secret response from Platform API.
-
-    Args:
-        data: JSON response containing encryptedValue, nonce,
-              serverPublicKey, and algorithm.
-
-    Returns:
-        EncryptedSecretResponse with decoded binary values.
-
-    Raises:
-        ValueError: If required fields are missing or invalid.
-    """
-    try:
-        encrypted_value = base64.b64decode(data["encryptedValue"])
-        nonce = base64.b64decode(data["nonce"])
-        server_public_key = base64.b64decode(data["serverPublicKey"])
-        algorithm = data["algorithm"]
-
-        return EncryptedSecretResponse(
-            encrypted_value=encrypted_value,
-            nonce=nonce,
-            server_public_key=server_public_key,
-            algorithm=algorithm,
-        )
-    except KeyError as e:
-        msg = f"Missing required field in encrypted response: {e}"
-        raise ValueError(msg) from e
-    except Exception as e:
-        msg = f"Failed to parse encrypted response: {e}"
-        raise ValueError(msg) from e
 
 
 def derive_symmetric_key(private_key: PrivateKey, peer_public_key: bytes) -> bytes:

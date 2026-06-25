@@ -11,10 +11,10 @@ from datetime import UTC, datetime
 import requests
 
 from plgt.core.crypto import (
+    EncryptedSecretResponse,
     decrypt_secret_value,
     encrypt_secret_value,
     generate_keypair,
-    parse_encrypted_response,
     public_key_to_base64,
 )
 from plgt.core.exceptions import ServiceError
@@ -125,15 +125,30 @@ class SecretsClient:
             msg = f"Failed to fetch secret {secret_id}: {e}"
             raise ServiceError(msg) from e
 
-    def get_secret_value(self, workspace: str, secret_id: str) -> str:
-        """Get a secret's decrypted value with E2E encryption.
+    def get_secret_value(
+        self,
+        workspace: str,
+        secret_id: str,
+        scope: str = SCOPE_WORKSPACE,
+        scope_entity_id: str | None = None,
+    ) -> str:
+        """Get a secret's decrypted value at a scope, with E2E encryption.
 
-        Performs X25519 key exchange with the server and decrypts
-        the response using XChaCha20-Poly1305.
+        Protocol (mirrors ``set_secret_value`` in reverse):
+        1. POST /pubkey to get the server's ephemeral public key and keyId.
+        2. Generate a client ephemeral keypair.
+        3. GET /value with ``clientPublicKey`` + ``keyId`` (+ scope) query params.
+        4. Re-derive the shared secret via ECDH against the server pubkey from
+           step 1 and decrypt with XChaCha20-Poly1305.
 
         Args:
             workspace: The workspace slug.
             secret_id: The secret ID (e.g., "matrix:SecretName").
+            scope: Which scope to read the value from — ``"workspace"`` (shared
+                by every principal in the workspace) or ``"principal"`` (private
+                to one principal). Defaults to ``"workspace"``.
+            scope_entity_id: The principal id to read for, required when
+                ``scope="principal"`` and ignored otherwise.
 
         Returns:
             Decrypted secret value as string.
@@ -142,20 +157,40 @@ class SecretsClient:
             ServiceError: If the request or decryption fails.
         """
         logger.debug(
-            "Fetching secret value %s in workspace %s",
+            "Fetching secret value %s in workspace %s at scope %s",
             secret_id,
             workspace,
+            scope,
         )
 
         try:
-            # Generate ephemeral keypair for E2E encryption
+            # Step 1: Get the server's ephemeral public key + keyId.
+            pubkey_response = self.session.post(
+                f"/api/v1/secrets/{workspace}/pubkey",
+            )
+            pubkey_data = pubkey_response.json()
+            if "data" in pubkey_data:
+                pubkey_data = pubkey_data["data"]
+
+            server_public_key = base64.b64decode(pubkey_data["serverPublicKey"])
+            key_id = pubkey_data["keyId"]
+
+            # Step 2: Generate the client ephemeral keypair.
             private_key, public_key = generate_keypair()
             public_key_b64 = public_key_to_base64(public_key)
 
-            # Send request with ephemeral public key
+            # Step 3: GET /value with the handshake as query params.
+            params = {
+                "clientPublicKey": public_key_b64,
+                "keyId": key_id,
+                "scope": scope,
+            }
+            if scope_entity_id is not None:
+                params["scopeEntityId"] = scope_entity_id
+
             response = self.session.get(
                 f"/api/v1/secrets/{workspace}/{secret_id}/value",
-                headers={"X-Ephemeral-Pubkey": public_key_b64},
+                params=params,
             )
 
             data = response.json()
@@ -164,11 +199,17 @@ class SecretsClient:
             if "data" in data:
                 data = data["data"]
 
-            # Parse and decrypt the response
-            encrypted = parse_encrypted_response(data)
+            # Step 4: Decrypt. The response envelope carries ciphertext + nonce
+            # + algorithm only; the server pubkey comes from the /pubkey step.
+            encrypted = EncryptedSecretResponse(
+                encrypted_value=base64.b64decode(data["encryptedValue"]),
+                nonce=base64.b64decode(data["nonce"]),
+                server_public_key=server_public_key,
+                algorithm=data["algorithm"],
+            )
             return decrypt_secret_value(encrypted, private_key)
 
-        except ValueError as e:
+        except (ValueError, KeyError) as e:
             logger.exception(
                 "Failed to decrypt secret value %s in workspace %s",
                 secret_id,
