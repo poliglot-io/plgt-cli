@@ -29,6 +29,7 @@ from plgt.services.rdf_operations import (
     merge_rdf_files,
     validate_rdf_file,
 )
+from plgt.services.env_substitution import substitute_env_vars
 from plgt.services.script_expander import expand_script_refs
 from plgt.services.ui_build_service import build_ui_components
 from plgt.utils.naming import validate_registry_slug
@@ -545,6 +546,12 @@ def build_matrix(
     # (where matrix.ttl lives by convention). This matches the validation
     # pipeline and the documented "Externalizing SPARQL with script://"
     # convention for the package format.
+    # Resolve ${VAR} / ${VAR:default} env placeholders in literal objects before
+    # serializing, so deployment-specific values (e.g. endpoint URLs) come from the
+    # build environment instead of the literal's local default. Run BEFORE script://
+    # inlining so inlined SPARQL bodies are left verbatim.
+    substitute_env_vars(merged_graph)
+
     task = progress.add_task(
         f"[{matrix_config.name}] Inlining script:// refs...", total=None
     )
