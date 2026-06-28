@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `plgt build` now resolves `${VAR}` / `${VAR:default}` environment placeholders in
+  RDF literal objects before packaging, so deployment-specific values (e.g. endpoint
+  URLs) are taken from the build environment instead of the literal's default.
+  Placeholders are substituted per-occurrence anywhere inside a literal (e.g.
+  `"${API_BASE_URL:http://localhost:8080}/v1"`), with precedence environment value →
+  default → empty string; datatype and language tags are preserved, and
+  IRIs/prefixes/comments are never touched.
+
 ## [0.1.0b12] — beta
 
 ### Added
