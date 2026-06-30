@@ -26,6 +26,7 @@ from plgt.services.rdf_operations import (
     BuildError,
     create_output_directory,
     extract_matrix_metadata,
+    extract_matrix_namespace,
     merge_rdf_files,
     validate_rdf_file,
 )
@@ -508,6 +509,7 @@ def build_matrix(
     task = progress.add_task(f"[{matrix_config.name}] Merging RDF files...", total=None)
     merged_graph = merge_rdf_files(validation_summary.valid_files)
     matrix_uri, _ = extract_matrix_metadata(merged_graph)
+    namespace_uri, prefix = extract_matrix_namespace(merged_graph, matrix_uri)
     progress.update(
         task,
         description=f"[{matrix_config.name}] Merged {len(validation_summary.valid_files)} files ({len(merged_graph)} triples)",
@@ -586,6 +588,8 @@ def build_matrix(
         name=matrix_config.name,
         output_dir=output_dir,
         matrix_uri=matrix_uri,
+        namespace_uri=namespace_uri,
+        prefix=prefix,
         total_triples=len(merged_graph),
         valid_files_count=len(validation_summary.valid_files),
         total_files_count=len(rdf_files),

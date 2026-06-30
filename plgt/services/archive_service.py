@@ -218,6 +218,19 @@ def create_package_archive(
                 }
                 for result in matrix_results
             ],
+            # One entry per shipped matrix namespace, declaring the namespace URI
+            # and its prefix. The registry's publish validation requires at least
+            # one entry here; without it every publish is rejected with
+            # "manifest.json must declare at least one entry in matrixNamespaces".
+            # Only matrices with a resolvable namespace URI are emitted.
+            "matrixNamespaces": [
+                {
+                    "namespaceUri": result.namespace_uri,
+                    "prefix": result.prefix,
+                }
+                for result in matrix_results
+                if result.namespace_uri
+            ],
         }
         # Thread the optional package-level metadata fields. Only emit when non-empty so a
         # package without these fields keeps a minimal manifest shape and the server-side

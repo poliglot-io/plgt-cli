@@ -1,11 +1,12 @@
 """Unit tests for archive service."""
 
+import json
 import os
 import struct
 import tarfile
 from pathlib import Path
 
-from plgt.models.build_types import PackageConfig
+from plgt.models.build_types import MatrixBuildResult, PackageConfig
 from plgt.services.archive_service import (
     create_package_archive,
     create_tar_gz_bundle,
@@ -190,6 +191,109 @@ class TestCreatePackageArchive:
         with tarfile.open(output_path, "r:gz") as tar:
             names = tar.getnames()
             assert "LICENSE.md" in names
+
+
+class TestManifestMatrixNamespaces:
+    """The manifest must declare matrixNamespaces — one {namespaceUri, prefix}
+    entry per shipped matrix. The registry's publish validation rejects a
+    package whose manifest.json has an empty/absent matrixNamespaces list, so
+    the CLI must always emit it for matrices with a resolvable namespace.
+    """
+
+    def _config(self, project_dir: Path) -> PackageConfig:
+        return PackageConfig(
+            name="demo",
+            version="1.0.0",
+            engine_version=">=1 <2",
+            project_dir=project_dir,
+        )
+
+    def _read_manifest(self, output_path: Path) -> dict:
+        with tarfile.open(output_path, "r:gz") as tar:
+            f = tar.extractfile(tar.getmember("manifest.json"))
+            assert f is not None
+            return json.loads(f.read().decode("utf-8"))
+
+    def test_emits_matrix_namespaces(self, tmp_path: Path):
+        project_dir = tmp_path / "pkg"
+        project_dir.mkdir()
+        results = [
+            MatrixBuildResult(
+                name="projects",
+                output_dir=tmp_path / "out-a",
+                matrix_uri="https://example.org/spec/projects#Projects",
+                total_triples=0,
+                valid_files_count=0,
+                total_files_count=0,
+                invalid_files=[],
+                namespace_uri="https://example.org/spec/projects#",
+                prefix="proj",
+            ),
+            MatrixBuildResult(
+                name="tasks",
+                output_dir=tmp_path / "out-b",
+                matrix_uri="https://example.org/spec/tasks#Tasks",
+                total_triples=0,
+                valid_files_count=0,
+                total_files_count=0,
+                invalid_files=[],
+                namespace_uri="https://example.org/spec/tasks#",
+                prefix="task",
+            ),
+        ]
+        output_path = tmp_path / "demo-package.tgz"
+
+        create_package_archive(self._config(project_dir), results, output_path)
+
+        manifest = self._read_manifest(output_path)
+        assert manifest["matrixNamespaces"] == [
+            {
+                "namespaceUri": "https://example.org/spec/projects#",
+                "prefix": "proj",
+            },
+            {
+                "namespaceUri": "https://example.org/spec/tasks#",
+                "prefix": "task",
+            },
+        ]
+        # The matrices array (bundle-path discovery) is preserved as-is.
+        assert [m["name"] for m in manifest["matrices"]] == ["projects", "tasks"]
+
+    def test_skips_matrix_without_resolvable_namespace(self, tmp_path: Path):
+        project_dir = tmp_path / "pkg"
+        project_dir.mkdir()
+        results = [
+            MatrixBuildResult(
+                name="ok",
+                output_dir=tmp_path / "out-a",
+                matrix_uri="https://example.org/spec/ok#Ok",
+                total_triples=0,
+                valid_files_count=0,
+                total_files_count=0,
+                invalid_files=[],
+                namespace_uri="https://example.org/spec/ok#",
+                prefix="ok",
+            ),
+            MatrixBuildResult(
+                name="nons",
+                output_dir=tmp_path / "out-b",
+                matrix_uri=None,
+                total_triples=0,
+                valid_files_count=0,
+                total_files_count=0,
+                invalid_files=[],
+                namespace_uri=None,
+                prefix=None,
+            ),
+        ]
+        output_path = tmp_path / "demo-package.tgz"
+
+        create_package_archive(self._config(project_dir), results, output_path)
+
+        manifest = self._read_manifest(output_path)
+        assert manifest["matrixNamespaces"] == [
+            {"namespaceUri": "https://example.org/spec/ok#", "prefix": "ok"}
+        ]
 
 
 def _gzip_header_mtime(path: Path) -> int:
