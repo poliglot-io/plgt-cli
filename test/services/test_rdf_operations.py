@@ -12,6 +12,7 @@ from plgt.services.rdf_operations import (
     create_output_directory,
     discover_rdf_files,
     extract_matrix_metadata,
+    extract_matrix_namespace,
     merge_rdf_files,
     validate_rdf_file,
     write_output,
@@ -746,3 +747,50 @@ class TestExtractMatrixMetadata:
 
         assert uri is None
         assert version is None
+
+
+class TestExtractMatrixNamespace:
+    """Test extracting the namespace URI + prefix for a matrix resource URI."""
+
+    def test_extract_namespace_and_prefix_from_bound_prefix(self):
+        """A bound @prefix yields both the namespace URI and the prefix."""
+        graph = Graph()
+        graph.parse(
+            data=(
+                "@prefix proj: <https://example.org/spec/projects#> .\n"
+                "@prefix mtx: <https://poliglot.io/os/spec/matrix#> .\n"
+                "proj:Projects a mtx:Matrix .\n"
+            ),
+            format="turtle",
+        )
+
+        namespace_uri, prefix = extract_matrix_namespace(
+            graph, "https://example.org/spec/projects#Projects"
+        )
+
+        assert namespace_uri == "https://example.org/spec/projects#"
+        assert prefix == "proj"
+
+    def test_extract_namespace_without_bound_prefix(self):
+        """An unbound namespace still yields the namespace URI, prefix None."""
+        graph = Graph()
+        graph.parse(
+            data=(
+                "@prefix mtx: <https://poliglot.io/os/spec/matrix#> .\n"
+                "<https://example.org/spec/projects#Projects> a mtx:Matrix .\n"
+            ),
+            format="turtle",
+        )
+
+        namespace_uri, prefix = extract_matrix_namespace(
+            graph, "https://example.org/spec/projects#Projects"
+        )
+
+        assert namespace_uri == "https://example.org/spec/projects#"
+        assert prefix is None
+
+    def test_extract_namespace_none_matrix_uri(self):
+        """A missing matrix URI yields (None, None)."""
+        graph = Graph()
+
+        assert extract_matrix_namespace(graph, None) == (None, None)

@@ -93,6 +93,12 @@ class MatrixBuildResult(NamedTuple):
     valid_files_count: int
     total_files_count: int
     invalid_files: list[tuple[Path, str]]
+    # Namespace URI + prefix for the matrix's resource URI, sourced from the
+    # matrix TTL's @prefix bindings. Emitted into manifest.json's
+    # matrixNamespaces so the registry can index each shipped namespace. None
+    # when the matrix URI has no bound prefix / splittable namespace.
+    namespace_uri: str | None = None
+    prefix: str | None = None
     # Migration files included in the bundle, relative to migrations/ root. Defaults to an empty
     # tuple at the type-checker level (NamedTuple defaults must be immutable); the build service
     # converts to a list when populating.

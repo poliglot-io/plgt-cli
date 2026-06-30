@@ -7,7 +7,8 @@ merging, and output operations.
 import logging
 from pathlib import Path
 
-from rdflib import Graph
+from rdflib import Graph, URIRef
+from rdflib.namespace import split_uri
 
 from plgt.core import settings
 from plgt.core.exceptions import CLIError
@@ -166,6 +167,45 @@ def extract_matrix_metadata(graph: Graph) -> tuple[str | None, str | None]:
             break
 
     return (matrix_uri, matrix_version)
+
+
+def extract_matrix_namespace(
+    graph: Graph, matrix_uri: str | None
+) -> tuple[str | None, str | None]:
+    """Extract the namespace URI and prefix for a matrix's resource URI.
+
+    The matrix namespace is the namespace portion of the matrix resource URI,
+    and the prefix is the ``@prefix`` declaration bound to that namespace in the
+    source TTL. Both are derived via rdflib's namespace APIs (no manual URI
+    string slicing).
+
+    Args:
+        graph: RDF graph the matrix was merged from (carries prefix bindings).
+        matrix_uri: The matrix resource URI returned by
+            :func:`extract_matrix_metadata`.
+
+    Returns:
+        Tuple of ``(namespace_uri, prefix)``. ``namespace_uri`` is ``None`` only
+        when the URI has no splittable namespace; ``prefix`` is ``None`` when no
+        ``@prefix`` is bound to the namespace.
+    """
+    if not matrix_uri:
+        return (None, None)
+
+    ref = URIRef(matrix_uri)
+    try:
+        prefix, namespace, _ = graph.namespace_manager.compute_qname(
+            ref, generate=False
+        )
+        return (str(namespace), prefix or None)
+    except (KeyError, ValueError):
+        # No prefix is bound to this namespace; still surface the namespace URI
+        # itself, split via rdflib's canonical splitter.
+        try:
+            namespace, _ = split_uri(matrix_uri)
+        except ValueError:
+            return (None, None)
+        return (str(namespace), None)
 
 
 def create_output_directory(output_dir: Path) -> None:
